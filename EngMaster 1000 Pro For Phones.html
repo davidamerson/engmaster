@@ -1,0 +1,1558 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EngMaster 1000 Pro (Mobile Fix)</title>
+    <style>
+        :root { --primary: #4f46e5; --accent: #f59e0b; --success: #10b981; --bg: #f8fafc; --text: #0f172a; --card-bg: #ffffff; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+        body { margin: 0; font-family: 'Segoe UI', 'Noto Sans Sinhala', sans-serif; background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        header { background: var(--card-bg); padding: 15px 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; z-index: 50; }
+        .logo { font-weight: 900; font-size: 1.4rem; color: var(--primary); }
+        .badge { background: #e0e7ff; color: var(--primary); padding: 6px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; }
+
+        #stage { flex: 1; position: relative; overflow: hidden; width: 100%; max-width: 600px; margin: 0 auto; }
+        .screen { position: absolute; inset: 0; background: var(--bg); transform: translateX(100%); transition: transform 0.3s; display: flex; flex-direction: column; opacity: 0; pointer-events: none; }
+        .screen.active { transform: translateX(0); opacity: 1; pointer-events: auto; }
+
+        /* SCROLLABLE AREAS */
+        .map-container, .learn-area, .build-area, .chat-feed { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 100px; }
+        
+        /* MAP */
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 12px; }
+        .day-box { background: var(--card-bg); aspect-ratio: 1; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); cursor: pointer; border: 2px solid transparent; }
+        .day-box.active { border-color: var(--primary); background: #eef2ff; }
+
+        /* LEARN */
+        .flashcard { width: 100%; height: 400px; position: relative; transform-style: preserve-3d; transition: transform 0.6s; cursor: pointer; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); background: var(--card-bg); margin-bottom: 20px; }
+        .flashcard.flipped { transform: rotateY(180deg); }
+        .face { position: absolute; inset: 0; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; text-align: center; border-radius: 24px; }
+        .back { transform: rotateY(180deg); background: #f0fdf4; border: 2px solid var(--success); }
+        .word-en { font-size: 2.5rem; font-weight: 800; color: #1e293b; margin-bottom: 10px; }
+        .word-si { font-size: 1.8rem; color: var(--primary); margin-bottom: 10px; }
+        
+        .nav-controls { display: flex; gap: 10px; }
+        .btn-nav { flex: 1; padding: 12px; border-radius: 10px; border: none; font-weight: bold; background: var(--primary); color: white; }
+        .btn-prev { background: #cbd5e1; color: #333; }
+
+        /* BUILD */
+        .target-slot { min-height: 60px; background: #fff; border: 2px dashed #cbd5e1; border-radius: 12px; display: flex; flex-wrap: wrap; gap: 5px; padding: 10px; margin-bottom: 20px; justify-content: center; }
+        .target-slot.correct { border-color: var(--success); background: #dcfce7; }
+        .target-slot.wrong { border-color: #ef4444; background: #fee2e2; }
+        .word-bank { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+        .chip { background: white; padding: 8px 15px; border-radius: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-weight: 600; border: 1px solid #e2e8f0; }
+        .chip.used { opacity: 0.3; pointer-events: none; }
+
+        /* SPEAK */
+        .chat-wrap { display: flex; flex-direction: column; height: 100%; }
+        .chat-feed { padding-bottom: 180px; }
+        .bubble { max-width: 85%; padding: 12px 16px; border-radius: 16px; margin-bottom: 10px; font-size: 1rem; }
+        .bot { background: white; align-self: flex-start; border-bottom-left-radius: 2px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .user { background: var(--primary); align-self: flex-end; border-bottom-right-radius: 2px; color: white; }
+        
+        .mic-panel { position: absolute; bottom: 0; left: 0; width: 100%; background: white; padding: 20px; border-top-left-radius: 24px; border-top-right-radius: 24px; box-shadow: 0 -5px 20px rgba(0,0,0,0.05); display: flex; flex-direction: column; align-items: center; z-index: 20; }
+        .mic-btn { width: 70px; height: 70px; border-radius: 50%; background: var(--primary); border: none; font-size: 2rem; color: white; display: flex; align-items: center; justify-content: center; box-shadow: 0 5px 15px rgba(79, 70, 229, 0.3); transition: 0.3s; }
+        .mic-btn.active { background: #ef4444; animation: pulse 1.5s infinite; }
+
+        nav { background: white; border-top: 1px solid #f1f5f9; height: 60px; display: flex; justify-content: space-around; align-items: center; z-index: 100; }
+        .nav-btn { background: none; border: none; display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; color: #94a3b8; }
+        .nav-btn.active { color: var(--primary); }
+
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">EngMaster</div>
+    <div class="badge" id="totalBadge">...</div>
+</header>
+
+<div id="stage">
+    <!-- MAP -->
+    <div id="screen-map" class="screen active">
+        <div class="map-container"><div class="grid" id="mapGrid"></div></div>
+    </div>
+
+    <!-- LEARN -->
+    <div id="screen-learn" class="screen">
+        <div class="learn-area">
+            <div class="flashcard" onclick="app.flip()">
+                <div class="face front">
+                    <div class="word-en" id="cardEn">...</div>
+                    <div style="color:#64748b" id="cardPro">...</div>
+                    <div style="margin-top:auto; font-size:0.8rem; color:#ccc;">Tap to Flip</div>
+                </div>
+                <div class="face back">
+                    <div class="word-si" id="cardSi">...</div>
+                    <div style="margin-top:10px; font-size:0.9rem; color:#666;" id="cardExSi">...</div>
+                    <button onclick="event.stopPropagation(); speech.speak(document.getElementById('cardEn').innerText)" style="margin-top:20px; width:50px; height:50px; border-radius:50%; background:var(--primary); color:white; border:none; font-size:1.5rem;">🔊</button>
+                </div>
+            </div>
+            <div class="nav-controls">
+                <button class="btn-nav btn-prev" onclick="app.prevWord()">Prev</button>
+                <button class="btn-nav" onclick="app.nextWord()">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- BUILD -->
+    <div id="screen-build" class="screen">
+        <div class="build-area">
+            <div style="text-align:center; margin-bottom:20px;">
+                <div style="color:#64748b; font-size:0.9rem;">Translate:</div>
+                <h3 style="color:var(--primary); margin:5px 0;" id="buildSi">...</h3>
+            </div>
+            <div class="target-slot" id="buildSlot"></div>
+            <div class="word-bank" id="buildBank"></div>
+            <button onclick="app.checkBuild()" style="width:100%; padding:15px; margin-top:20px; background:var(--primary); color:white; border:none; border-radius:12px; font-weight:bold;">Check Answer</button>
+        </div>
+    </div>
+
+    <!-- SPEAK -->
+    <div id="screen-speak" class="screen">
+        <div class="chat-wrap">
+            <div class="chat-feed" id="chatList"></div>
+            <div class="mic-panel">
+                <div style="margin-bottom:10px; color:#666;" id="micStatus">Tap Mic to Start</div>
+                <button class="mic-btn" id="micBtn" onclick="recorder.toggle()">🎤</button>
+                <div style="font-size:0.7rem; color:#999; margin-top:10px;">(Android Only - Must be HTTPS)</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<nav>
+    <button class="nav-btn active" onclick="app.nav('screen-map')">Map</button>
+    <button class="nav-btn" onclick="app.nav('screen-learn')">Learn</button>
+    <button class="nav-btn" onclick="app.nav('screen-build')">Build</button>
+    <button class="nav-btn" onclick="app.nav('screen-speak')">Speak</button>
+</nav>
+
+<script>
+    const fullData = []; 
+    const app = {
+        state: { day: 0, idx: 0, mode: 'word' },
+        
+        init: function() {
+            if(fullData.length===0) return;
+            document.getElementById('totalBadge').innerText = `${fullData.length} Words`;
+            this.renderMap();
+            // Force load voices on mobile
+            if(window.speechSynthesis) window.speechSynthesis.getVoices();
+        },
+
+        getDays: () => {
+            const chunks = [];
+            for(let i=0; i<fullData.length; i+=10) chunks.push(fullData.slice(i, i+10));
+            return chunks;
+        },
+
+        nav: function(s) {
+            document.querySelectorAll('.screen').forEach(e=>e.classList.remove('active'));
+            document.getElementById(s).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(e=>e.classList.remove('active'));
+            const m = {'screen-map':0, 'screen-learn':1, 'screen-build':2, 'screen-speak':3};
+            document.querySelectorAll('.nav-btn')[m[s]].classList.add('active');
+
+            if(s === 'screen-speak') this.initChat();
+            else if(recorder.isRec) recorder.stop();
+            
+            if(s === 'screen-build') this.initBuild();
+        },
+
+        renderMap: function() {
+            const g = document.getElementById('mapGrid');
+            g.innerHTML = '';
+            this.getDays().forEach((d, i) => {
+                const el = document.createElement('div');
+                el.className = 'day-box';
+                el.innerHTML = `<div style="font-size:1.2rem; font-weight:bold;">${i+1}</div><div style="font-size:0.7rem;">Day</div>`;
+                el.onclick = () => { this.state.day=i; this.state.idx=0; this.loadCard(); this.nav('screen-learn'); };
+                g.appendChild(el);
+            });
+        },
+
+        // LEARN
+        loadCard: function() {
+            const w = this.getDays()[this.state.day][this.state.idx];
+            document.getElementById('cardEn').innerText = w.e;
+            document.getElementById('cardPro').innerText = `/${w.p}/`;
+            document.getElementById('cardSi').innerText = w.s;
+            document.getElementById('cardExSi').innerText = w.es || "";
+            document.querySelector('.flashcard').classList.remove('flipped');
+            // Auto speak with user interaction safety
+            speech.speak(w.e); 
+        },
+        flip: () => document.querySelector('.flashcard').classList.toggle('flipped'),
+        nextWord: function() {
+            if(this.state.idx < 9) { this.state.idx++; this.loadCard(); }
+            else if(confirm("Try Sentence Building?")) this.nav('screen-build');
+        },
+        prevWord: function() { if(this.state.idx > 0) { this.state.idx--; this.loadCard(); } },
+
+        // BUILD
+        initBuild: function() { this.state.idx=0; this.loadBuild(); },
+        loadBuild: function() {
+            const w = this.getDays()[this.state.day][this.state.idx];
+            document.getElementById('buildSi').innerText = `"${w.es}"`;
+            this.buildTarget = w.ex.replace(/[.,?!]/g, "").trim();
+            const words = this.buildTarget.split(' ').sort(()=>Math.random()-0.5);
+            const slot = document.getElementById('buildSlot'); slot.innerHTML=''; slot.className='target-slot';
+            const bank = document.getElementById('buildBank'); bank.innerHTML='';
+            
+            words.forEach(wd => {
+                const c = document.createElement('div'); c.className='chip'; c.innerText=wd;
+                c.onclick = () => {
+                    if(c.classList.contains('used')) return;
+                    const cl = c.cloneNode(true); cl.classList.remove('used');
+                    cl.onclick=()=>{cl.remove(); c.classList.remove('used');};
+                    slot.appendChild(cl); c.classList.add('used'); speech.speak(wd);
+                };
+                bank.appendChild(c);
+            });
+        },
+        checkBuild: function() {
+            const slot = document.getElementById('buildSlot');
+            const usr = Array.from(slot.children).map(c=>c.innerText).join(' ');
+            if(usr.toLowerCase() === this.buildTarget.toLowerCase()) {
+                slot.classList.add('correct'); speech.speak("Correct!");
+                setTimeout(()=>{
+                    if(this.state.idx<9) { this.state.idx++; this.loadBuild(); }
+                    else if(confirm("Practice Speaking?")) this.nav('screen-speak');
+                }, 1500);
+            } else {
+                slot.classList.add('wrong'); speech.speak("Try again");
+                setTimeout(()=>slot.classList.remove('wrong'), 800);
+            }
+        },
+
+        // SPEAK
+        initChat: function() {
+            this.state.idx=0; this.state.mode='word';
+            document.getElementById('chatList').innerHTML='';
+            this.botMsg("Let's start! Say the word.");
+            this.askChat();
+        },
+        askChat: function() {
+            const w = this.getDays()[this.state.day][this.state.idx];
+            const q = this.state.mode==='word' ? `How do you say "${w.s}"?` : `How do you say "${w.es}"?`;
+            setTimeout(()=>{ this.botMsg(q); speech.speak(q); }, 500);
+        },
+        handleVoice: function(txt) {
+            this.usrMsg(txt);
+            const w = this.getDays()[this.state.day][this.state.idx];
+            const clean = txt.toLowerCase().replace(/[^a-z0-9 ]/g,"");
+            const target = (this.state.mode==='word' ? w.e : w.ex).toLowerCase().replace(/[^a-z0-9 ]/g,"");
+            
+            if(clean.includes(target) || target.includes(clean)) {
+                this.botMsg("✅ Correct!"); speech.speak("Correct!");
+                if(this.state.idx < 9) {
+                    this.state.idx++; setTimeout(()=>this.askChat(), 1500);
+                } else {
+                    if(this.state.mode==='word') {
+                        this.state.mode='sentence'; this.state.idx=0;
+                        this.botMsg("Now let's try sentences!"); speech.speak("Now sentences");
+                        setTimeout(()=>this.askChat(), 2000);
+                    } else {
+                        this.botMsg("🎉 Day Completed!"); speech.speak("Day Completed");
+                    }
+                }
+            } else {
+                const ans = this.state.mode==='word' ? w.e : w.ex;
+                this.botMsg(`❌ Say: ${ans}`); speech.speak(ans);
+            }
+        },
+        botMsg: function(t) { 
+            const d=document.createElement('div'); d.className='bubble bot'; d.innerText=t; 
+            document.getElementById('chatList').appendChild(d); document.getElementById('chatList').scrollTop=9999; 
+        },
+        usrMsg: function(t) { 
+            const d=document.createElement('div'); d.className='bubble user'; d.innerText=t; 
+            document.getElementById('chatList').appendChild(d); document.getElementById('chatList').scrollTop=9999; 
+        }
+    };
+
+    const speech = {
+        speak: function(t) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(t);
+            u.lang = 'en-US'; // Generic, works better on mobile defaults
+            u.rate = 0.9;
+            window.speechSynthesis.speak(u);
+        },
+        init: function() { if(window.speechSynthesis) window.speechSynthesis.getVoices(); }
+    };
+
+    const recorder = {
+        rec: null, isRec: false,
+        init: function() {
+            if(!window.webkitSpeechRecognition) {
+                // IPHONE FAILSAFE MESSAGE
+                if(/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+                    alert("On iPhone, please open this site in 'Chrome' or use the keyboard dictation if mic fails.");
+                } else {
+                    alert("Use Chrome browser for voice.");
+                }
+                return;
+            }
+            this.rec = new webkitSpeechRecognition();
+            this.rec.lang = 'en-US';
+            this.rec.continuous = true;
+            this.rec.interimResults = false;
+            
+            this.rec.onstart = () => { this.isRec=true; document.getElementById('micBtn').classList.add('active'); document.getElementById('micStatus').innerText="Listening..."; };
+            this.rec.onend = () => { 
+                if(this.isRec && document.getElementById('screen-speak').classList.contains('active')) try{this.rec.start()}catch(e){}
+                else { this.isRec=false; document.getElementById('micBtn').classList.remove('active'); document.getElementById('micStatus').innerText="Tap Mic"; }
+            };
+            this.rec.onresult = (e) => app.handleVoice(e.results[e.results.length-1][0].transcript);
+            this.rec.onerror = (e) => { 
+                if(e.error==='not-allowed') { alert("Allow Mic Permissions!"); this.isRec=false; }
+            };
+        },
+        toggle: function() { if(!this.rec) this.init(); if(this.isRec) this.stop(); else this.start(); },
+        start: function() { if(!this.rec) this.init(); try{this.rec.start(); this.isRec=true;}catch(e){} },
+        stop: function() { this.isRec=false; if(this.rec) this.rec.stop(); }
+    };
+
+    window.onload = () => setTimeout(()=>app.init(),500);
+
+    /* --- PASTE DATA PARTS HERE --- */
+
+/* --- PART 2: WORDS 1 - 100 (Days 1-10) --- */
+fullData.push(
+    // DAY 1: අත්‍යවශ්‍ය මූලික වචන (Essentials)
+    {e:"Hello", s:"ආයුබෝවන්", p:"həˈləʊ", ex:"Hello my friend", es:"ආයුබෝවන් මගේ යාලුවා"},
+    {e:"I", s:"මම", p:"aɪ", ex:"I am happy", es:"මම සතුටින්"},
+    {e:"You", s:"ඔයා", p:"juː", ex:"You are good", es:"ඔයා හොඳයි"},
+    {e:"Yes", s:"ඔව්", p:"jɛs", ex:"Yes I can", es:"ඔව් මට පුළුවන්"},
+    {e:"No", s:"නැහැ", p:"nəʊ", ex:"No thank you", es:"එපා ස්තූතියි"},
+    {e:"Please", s:"කරුණාකර", p:"pliːz", ex:"Please help me", es:"කරුණාකර මට උදව් කරන්න"},
+    {e:"Thanks", s:"ස්තූතියි", p:"θæŋks", ex:"Thanks a lot", es:"ගොඩක් ස්තූතියි"},
+    {e:"Good", s:"හොඳයි", p:"gʊd", ex:"Very good job", es:"හරිම හොඳ වැඩක්"},
+    {e:"Bad", s:"නරකයි", p:"bæd", ex:"This is bad", es:"මේක නරකයි"},
+    {e:"Name", s:"නම", p:"neɪm", ex:"My name is Sam", es:"මගේ නම සෑම්"},
+
+    // DAY 2: ක්‍රියාපද - 1 (Basic Verbs)
+    {e:"Eat", s:"කනවා", p:"iːt", ex:"I eat rice", es:"මම බත් කනවා"},
+    {e:"Drink", s:"බොනවා", p:"drɪŋk", ex:"I drink water", es:"මම වතුර බොනවා"},
+    {e:"Sleep", s:"නිදාගන්නවා", p:"sliːp", ex:"I want to sleep", es:"මට නිදාගන්න ඕනා"},
+    {e:"Go", s:"යන්න", p:"gəʊ", ex:"Let us go home", es:"අපි ගෙදර යමු"},
+    {e:"Come", s:"එන්න", p:"kʌm", ex:"Come here please", es:"කරුණාකර මෙහෙ එන්න"},
+    {e:"Sit", s:"වාඩිවෙන්න", p:"sɪt", ex:"Sit on the chair", es:"පුටුවේ වාඩිවෙන්න"},
+    {e:"Stand", s:"හිටගන්න", p:"stænd", ex:"Stand up now", es:"දැන් හිටගන්න"},
+    {e:"Walk", s:"ඇවිදිනවා", p:"wɔːk", ex:"I walk to school", es:"මම ඉස්කෝලෙට පයින් යනවා"},
+    {e:"Run", s:"දුවනවා", p:"rʌn", ex:"Do not run fast", es:"වේගයෙන් දුවන්න එපා"},
+    {e:"Stop", s:"නවත්වන්න", p:"stɒp", ex:"Stop the bus", es:"බස් එක නවත්වන්න"},
+
+    // DAY 3: පවුලේ අය (Family)
+    {e:"Family", s:"පවුල", p:"ˈfæmɪli", ex:"I love my family", es:"මම මගේ පවුලට ආදරෙයි"},
+    {e:"Mother", s:"අම්මා", p:"ˈmʌðə", ex:"My mother cooks", es:"මගේ අම්මා උයනවා"},
+    {e:"Father", s:"තාත්තා", p:"ˈfɑːðə", ex:"My father works", es:"මගේ තාත්තා වැඩ කරනවා"},
+    {e:"Brother", s:"සහෝදරයා", p:"ˈbrʌðə", ex:"He is my brother", es:"ඔහු මගේ සහෝදරයා"},
+    {e:"Sister", s:"සහෝදරිය", p:"ˈsɪstə", ex:"She is my sister", es:"ඇය මගේ සහෝදරිය"},
+    {e:"Friend", s:"යාලුවා", p:"frɛnd", ex:"My best friend", es:"මගේ හොඳම යාලුවා"},
+    {e:"Man", s:"මිනිසා", p:"mæn", ex:"The man is tall", es:"ඒ මිනිසා උසයි"},
+    {e:"Woman", s:"ගැහැණු කෙනා", p:"ˈwʊmən", ex:"She is a woman", es:"ඇය කාන්තාවක්"},
+    {e:"Boy", s:"පිරිමි ළමයා", p:"bɔɪ", ex:"The boy plays", es:"පිරිමි ළමයා සෙල්ලම් කරනවා"},
+    {e:"Girl", s:"ගැහැණු ළමයා", p:"gɜːl", ex:"The girl sings", es:"ගැහැණු ළමයා සිංදු කියනවා"},
+
+    // DAY 4: ගෙදර දොරේ දේවල් (House Objects)
+    {e:"Home", s:"ගෙදර", p:"həʊm", ex:"I go home", es:"මම ගෙදර යනවා"},
+    {e:"Door", s:"දොර", p:"dɔː", ex:"Open the door", es:"දොර අරින්න"},
+    {e:"Window", s:"ජනේලය", p:"ˈwɪndəʊ", ex:"Close the window", es:"ජනේලය වහන්න"},
+    {e:"Table", s:"මේසය", p:"ˈteɪbl", ex:"On the table", es:"මේසය උඩ"},
+    {e:"Chair", s:"පුටුව", p:"ʧeə", ex:"A plastic chair", es:"ප්ලාස්ටික් පුටුවක්"},
+    {e:"Bed", s:"ඇඳ", p:"bɛd", ex:"Sleep in bed", es:"ඇඳේ නිදාගන්න"},
+    {e:"Room", s:"කාමරය", p:"ruːm", ex:"Clean the room", es:"කාමරය පිරිසිදු කරන්න"},
+    {e:"Kitchen", s:"කුස්සිය", p:"ˈkɪʧɪn", ex:"Cook in kitchen", es:"කුස්සියේ උයනවා"},
+    {e:"Water", s:"වතුර", p:"ˈwɔːtə", ex:"Give me water", es:"මට වතුර දෙන්න"},
+    {e:"Light", s:"විදුලි බුබුල/එළිය", p:"laɪt", ex:"Turn on light", es:"ලයිට් එක දාන්න"},
+
+    // DAY 5: ස්ථාන (Places)
+    {e:"School", s:"පාසල", p:"skuːl", ex:"Go to school", es:"පාසලට යන්න"},
+    {e:"Shop", s:"කඩේ", p:"ʃɒp", ex:"Buy at shop", es:"කඩෙන් ගන්න"},
+    {e:"Office", s:"කාර්යාලය", p:"ˈɒfɪs", ex:"Work in office", es:"කාර්යාලයේ වැඩ කරනවා"},
+    {e:"Hospital", s:"රෝහල", p:"ˈhɒspɪtl", ex:"Go to hospital", es:"රෝහලට යන්න"},
+    {e:"Bank", s:"බැංකුව", p:"bæŋk", ex:"Money in bank", es:"බැංකුවේ සල්ලි"},
+    {e:"Road", s:"පාර", p:"rəʊd", ex:"Cross the road", es:"පාර පනින්න"},
+    {e:"Park", s:"උද්‍යානය", p:"pɑːk", ex:"Play in park", es:"පාක් එකේ සෙල්ලම් කරනවා"},
+    {e:"Bus", s:"බස් එක", p:"bʌs", ex:"Bus is late", es:"බස් එක පරක්කුයි"},
+    {e:"City", s:"නගරය", p:"ˈsɪti", ex:"Colombo is city", es:"කොළඹ කියන්නේ නගරයක්"},
+    {e:"Village", s:"ගම", p:"ˈvɪlɪʤ", ex:"I love my village", es:"මම මගේ ගමට ආදරෙයි"},
+
+    // DAY 6: විස්තර කිරීම් (Adjectives 1)
+    {e:"Big", s:"ලොකු", p:"bɪg", ex:"A big house", es:"ලොකු ගෙයක්"},
+    {e:"Small", s:"පොඩි", p:"smɔːl", ex:"A small cat", es:"පොඩි පූසෙක්"},
+    {e:"Hot", s:"රස්නෙයි", p:"hɒt", ex:"Hot tea", es:"රස්නේ තේ"},
+    {e:"Cold", s:"සීතලයි", p:"kəʊld", ex:"Cold water", es:"සීතල වතුර"},
+    {e:"New", s:"අලුත්", p:"njuː", ex:"A new phone", es:"අලුත් පෝන් එකක්"},
+    {e:"Old", s:"පරණ/වයසක", p:"əʊld", ex:"An old car", es:"පරණ කාර් එකක්"},
+    {e:"Happy", s:"සතුටුයි", p:"ˈhæpi", ex:"I am happy", es:"මම සතුටින්"},
+    {e:"Sad", s:"දුකයි", p:"sæd", ex:"He is sad", es:"ඔහු දුකින්"},
+    {e:"Beautiful", s:"ලස්සනයි", p:"ˈbjuːtəfʊl", ex:"Beautiful flower", es:"ලස්සන මලක්"},
+    {e:"Ugly", s:"කැතයි", p:"ˈʌgli", ex:"Ugly dog", es:"කැත බල්ලෙක්"},
+
+    // DAY 7: කෑම බීම (Food & Drink)
+    {e:"Food", s:"කෑම", p:"fuːd", ex:"Tasty food", es:"රස කෑම"},
+    {e:"Rice", s:"බත්", p:"raɪs", ex:"I eat rice", es:"මම බත් කනවා"},
+    {e:"Bread", s:"පාන්", p:"brɛd", ex:"Bread and butter", es:"පාන් සහ බටර්"},
+    {e:"Milk", s:"කිරි", p:"mɪlk", ex:"Drink milk", es:"කිරි බොන්න"},
+    {e:"Tea", s:"තේ", p:"tiː", ex:"Cup of tea", es:"තේ කෝප්පයක්"},
+    {e:"Sugar", s:"සීනි", p:"ˈʃʊgə", ex:"Sweet sugar", es:"පැණිරස සීනි"},
+    {e:"Salt", s:"ලුණු", p:"sɔːlt", ex:"Add some salt", es:"ලුණු ටිකක් දාන්න"},
+    {e:"Egg", s:"බිත්තර", p:"ɛg", ex:"Boiled egg", es:"තම්බපු බිත්තර"},
+    {e:"Fish", s:"මාළු", p:"fɪʃ", ex:"Fried fish", es:"බැදපු මාළු"},
+    {e:"Fruit", s:"පළතුරු", p:"fruːt", ex:"Fresh fruit", es:"නැවුම් පළතුරු"},
+
+    // DAY 8: සොබාදහම සහ සතුන් (Nature & Animals)
+    {e:"Sun", s:"ඉර", p:"sʌn", ex:"Sun is hot", es:"ඉර රස්නෙයි"},
+    {e:"Moon", s:"හඳ", p:"muːn", ex:"Moon at night", es:"රෑට පායන හඳ"},
+    {e:"Rain", s:"වැස්ස", p:"reɪn", ex:"I like rain", es:"මම වැස්සට ආසයි"},
+    {e:"Tree", s:"ගස", p:"triː", ex:"Green tree", es:"කොළ පාට ගසක්"},
+    {e:"Flower", s:"මල", p:"ˈflaʊə", ex:"Red flower", es:"රතු මලක්"},
+    {e:"Dog", s:"බල්ලා", p:"dɒg", ex:"My pet dog", es:"මගේ සුරතල් බල්ලා"},
+    {e:"Cat", s:"පූසා", p:"kæt", ex:"Cat sleeps", es:"පූසා නිදාගන්නවා"},
+    {e:"Bird", s:"කුරුල්ලා", p:"bɜːd", ex:"Bird flies", es:"කුරුල්ලා පියාඹනවා"},
+    {e:"Cow", s:"එළදෙන", p:"kaʊ", ex:"Cow gives milk", es:"එළදෙන කිරි දෙනවා"},
+    {e:"Sky", s:"අහස", p:"skaɪ", ex:"Blue sky", es:"නිල් අහස"},
+
+    // DAY 9: ශරීර අවයව (Body Parts)
+    {e:"Head", s:"ඔළුව", p:"hɛd", ex:"My head hurts", es:"මගේ ඔළුව රිදෙනවා"},
+    {e:"Eye", s:"ඇස", p:"aɪ", ex:"Close your eye", es:"ඔයාගේ ඇහැ වහන්න"},
+    {e:"Ear", s:"කන", p:"ɪə", ex:"Listen with ear", es:"කනෙන් අහන්න"},
+    {e:"Mouth", s:"කට", p:"maʊθ", ex:"Open mouth", es:"කට අරින්න"},
+    {e:"Hand", s:"අත", p:"hænd", ex:"Wash your hand", es:"ඔයාගේ අත හෝදන්න"},
+    {e:"Leg", s:"කකුල", p:"lɛg", ex:"Long leg", es:"දිග කකුලක්"},
+    {e:"Hair", s:"කොණ්ඩය", p:"heə", ex:"Black hair", es:"කළු කොණ්ඩය"},
+    {e:"Face", s:"මූණ", p:"feɪs", ex:"Wash your face", es:"ඔයාගේ මූණ හෝදන්න"},
+    {e:"Tooth", s:"දත", p:"tuːθ", ex:"Brush your tooth", es:"ඔයාගේ දත මදින්න"},
+    {e:"Back", s:"පිටුපස/කොන්ද", p:"bæk", ex:"My back hurts", es:"මගේ කොන්ද රිදෙනවා"},
+
+    // DAY 10: ඉලක්කම් සහ පාට (Numbers & Colors)
+    {e:"One", s:"එක", p:"wʌn", ex:"One book", es:"එක පොතක්"},
+    {e:"Two", s:"දෙක", p:"tuː", ex:"Two hands", es:"අත් දෙකක්"},
+    {e:"Three", s:"තුන", p:"θriː", ex:"Three days", es:"දවස් තුනක්"},
+    {e:"Red", s:"රතු", p:"rɛd", ex:"Red apple", es:"රතු ඇපල් ගෙඩියක්"},
+    {e:"Blue", s:"නිල්", p:"bluː", ex:"Blue sky", es:"නිල් අහස"},
+    {e:"Green", s:"කොළ", p:"griːn", ex:"Green grass", es:"කොළ පාට තණකොළ"},
+    {e:"Black", s:"කළු", p:"blæk", ex:"Black cat", es:"කළු පූසෙක්"},
+    {e:"White", s:"සුදු", p:"waɪt", ex:"White shirt", es:"සුදු කමිසයක්"},
+    {e:"Money", s:"සල්ලි", p:"ˈmʌni", ex:"I need money", es:"මට සල්ලි ඕනා"},
+    {e:"Day", s:"දවස", p:"deɪ", ex:"Good day", es:"සුබ දවසක්"}
+);
+
+/* --- PART 3: WORDS 101 - 200 (Days 11-20) --- */
+fullData.push(
+    // DAY 11: ඇඳුම් පැළඳුම් (Clothing)
+    {e:"Shirt", s:"කමිසය", p:"ʃɜːt", ex:"Nice blue shirt", es:"ලස්සන නිල් කමිසයක්"},
+    {e:"Shoe", s:"සපත්තුව", p:"ʃuː", ex:"Wear your shoe", es:"ඔයාගේ සපත්තුව දාගන්න"},
+    {e:"Dress", s:"ඇඳුම/ගවුම", p:"drɛs", ex:"Red dress", es:"රතු පාට ගවුමක්"},
+    {e:"Hat", s:"තොප්පිය", p:"hæt", ex:"Put on hat", es:"තොප්පිය දාගන්න"},
+    {e:"Pants", s:"කලිසම", p:"pænts", ex:"Black pants", es:"කළු පාට කලිසමක්"},
+    {e:"Wear", s:"ඇඳගන්නවා/දාගන්නවා", p:"weə", ex:"I wear a tie", es:"මම ටයි එකක් දාගන්නවා"},
+    {e:"Cloth", s:"රෙදි", p:"klɒθ", ex:"Clean cloth", es:"පිරිසිදු රෙදි"},
+    {e:"Pocket", s:"සාක්කුව", p:"ˈpɒkɪt", ex:"Money in pocket", es:"සාක්කුවේ සල්ලි තියෙනවා"},
+    {e:"Bag", s:"බෑගය", p:"bæg", ex:"School bag", es:"පාසල් බෑගය"},
+    {e:"Ring", s:"මුද්ද", p:"rɪŋ", ex:"Gold ring", es:"රත්තරන් මුද්දක්"},
+
+    // DAY 12: රැකියා සහ වෘත්තීන් (Jobs)
+    {e:"Doctor", s:"වෛද්‍යවරයා", p:"ˈdɒktə", ex:"See a doctor", es:"දොස්තර කෙනෙක් හම්බවෙන්න"},
+    {e:"Teacher", s:"ගුරුවරයා", p:"ˈtiːʧə", ex:"Good teacher", es:"හොඳ ගුරුවරයෙක්"},
+    {e:"Driver", s:"රියදුරු", p:"ˈdraɪvə", ex:"Bus driver", es:"බස් රියදුරා"},
+    {e:"Farmer", s:"ගොවියා", p:"ˈfɑːmə", ex:"Farmer works hard", es:"ගොවියා මහන්සි වී වැඩ කරයි"},
+    {e:"Police", s:"පොලිසිය", p:"pəˈliːs", ex:"Call the police", es:"පොලිසියට කතා කරන්න"},
+    {e:"Nurse", s:"හෙදිය", p:"nɜːs", ex:"Kind nurse", es:"කරුණාවන්ත හෙදියක්"},
+    {e:"Boss", s:"ලොක්කා", p:"bɒs", ex:"My boss is here", es:"මගේ බොස් මෙහෙ ඉන්නවා"},
+    {e:"Work", s:"වැඩ", p:"wɜːk", ex:"I work daily", es:"මම දිනපතා වැඩ කරනවා"},
+    {e:"Job", s:"රැකියාව", p:"ʤɒb", ex:"I need a job", es:"මට රස්සාවක් ඕනා"},
+    {e:"Student", s:"ශිෂ්‍යයා", p:"ˈstjuːdənt", ex:"Smart student", es:"දක්ෂ ශිෂ්‍යයෙක්"},
+
+    // DAY 13: ගමනාගමනය (Transport)
+    {e:"Car", s:"කාර් එක", p:"kɑː", ex:"Drive the car", es:"කාර් එක එළවන්න"},
+    {e:"Bus", s:"බස් එක", p:"bʌs", ex:"Bus stop", es:"බස් නැවතුම"},
+    {e:"Train", s:"කෝච්චිය", p:"treɪn", ex:"Fast train", es:"වේගවත් කෝච්චියක්"},
+    {e:"Bike", s:"බයිසිකලය", p:"baɪk", ex:"Ride a bike", es:"බයිසිකලයක් පදින්න"},
+    {e:"Boat", s:"බෝට්ටුව", p:"bəʊt", ex:"Small boat", es:"පොඩි බෝට්ටුවක්"},
+    {e:"Ticket", s:"ටිකට් එක", p:"ˈtɪkɪt", ex:"Buy a ticket", es:"ටිකට් එකක් ගන්න"},
+    {e:"Drive", s:"එළවනවා", p:"draɪv", ex:"Drive slow", es:"හිමින් එළවන්න"},
+    {e:"Ride", s:"පදිනවා", p:"raɪd", ex:"Ride a horse", es:"අශ්වයෙක් පදින්න"},
+    {e:"Road", s:"පාර", p:"rəʊd", ex:"Long road", es:"දිග පාරක්"},
+    {e:"Wheel", s:"රෝදය", p:"wiːl", ex:"Round wheel", es:"රවුම් රෝදයක්"},
+
+    // DAY 14: හැඟීම් සහ දැනීම් (Feelings)
+    {e:"Angry", s:"කේන්තියි", p:"ˈæŋgri", ex:"Do not be angry", es:"කේන්ති ගන්න එපා"},
+    {e:"Tired", s:"මහන්සියි", p:"ˈtaɪəd", ex:"I am tired", es:"මට මහන්සියි"},
+    {e:"Hungry", s:"බඩගිනියි", p:"ˈhʌŋgri", ex:"I am hungry", es:"මට බඩගිනියි"},
+    {e:"Thirsty", s:"පිපාසයි", p:"ˈθɜːsti", ex:"I am thirsty", es:"මට තිබහයි"},
+    {e:"Sick", s:"අසනීපයි", p:"sɪk", ex:"I feel sick", es:"මට අසනීප වගේ"},
+    {e:"Busy", s:"කාර්යබහුලයි", p:"ˈbɪzi", ex:"I am very busy", es:"මම ගොඩක් කාර්යබහුලයි"},
+    {e:"Free", s:"නිවාඩු/නිදහස්", p:"friː", ex:"Are you free", es:"ඔයා නිවාඩුද (නිදහස්ද)"},
+    {e:"Late", s:"පරක්කුයි", p:"leɪt", ex:"Do not be late", es:"පරක්කු වෙන්න එපා"},
+    {e:"Early", s:"වේලාසන", p:"ˈɜːli", ex:"Wake up early", es:"වේලාසනින් නැගිටින්න"},
+    {e:"Funny", s:"විහිළු/විනෝදජනක", p:"ˈfʌni", ex:"Funny story", es:"විහිළු කතාවක්"},
+
+    // DAY 15: දින චරියාව (Daily Routine)
+    {e:"Wake", s:"නැගිටිනවා (ඇහැරෙනවා)", p:"weɪk", ex:"Wake up now", es:"දැන් නැගිටින්න"},
+    {e:"Wash", s:"සෝදනවා", p:"wɒʃ", ex:"Wash your face", es:"ඔයාගේ මූණ හෝදන්න"},
+    {e:"Brush", s:"මදිනවා", p:"brʌʃ", ex:"Brush teeth", es:"දත් මදින්න"},
+    {e:"Bath", s:"නානවා", p:"bɑːθ", ex:"Take a bath", es:"නා ගන්න"},
+    {e:"Cook", s:"උයනවා", p:"kʊk", ex:"Cook rice", es:"බත් උයන්න"},
+    {e:"Clean", s:"පිරිසිදු කරනවා", p:"kliːn", ex:"Clean the room", es:"කාමරය පිරිසිදු කරන්න"},
+    {e:"Watch", s:"නරඹනවා", p:"wɒʧ", ex:"Watch TV", es:"ටීවී බලන්න"},
+    {e:"Listen", s:"සවන් දෙනවා (අහනවා)", p:"ˈlɪsn", ex:"Listen to me", es:"මම කියන දේ අහන්න"},
+    {e:"Play", s:"සෙල්ලම් කරනවා", p:"pleɪ", ex:"Play cricket", es:"ක්‍රිකට් ගහන්න (සෙල්ලම් කරන්න)"},
+    {e:"Read", s:"කියවනවා", p:"riːd", ex:"Read a book", es:"පොතක් කියවන්න"},
+
+    // DAY 16: ප්‍රශ්න වචන (Question Words)
+    {e:"What", s:"මොකක්ද", p:"wɒt", ex:"What is this", es:"මේක මොකක්ද"},
+    {e:"Where", s:"කොහෙද", p:"weə", ex:"Where is it", es:"ඒක කොහෙද තියෙන්නේ"},
+    {e:"When", s:"කවදාද/කොයි වෙලේද", p:"wɛn", ex:"When will you come", es:"ඔයා එන්නේ කවදාද"},
+    {e:"Who", s:"කවුද", p:"huː", ex:"Who is he", es:"ඔහු කවුද"},
+    {e:"Why", s:"ඇයි", p:"waɪ", ex:"Why are you crying", es:"ඇයි ඔයා අඬන්නේ"},
+    {e:"How", s:"කොහොමද", p:"haʊ", ex:"How are you", es:"ඔයාට කොහොමද"},
+    {e:"Which", s:"කොයි එකද", p:"wɪʧ", ex:"Which pen", es:"කොයි පෑනද"},
+    {e:"Many", s:"ගොඩක් (ගණන් කළ හැකි)", p:"ˈmɛni", ex:"Many people", es:"මිනිස්සු ගොඩක්"},
+    {e:"Much", s:"ගොඩක් (ගණන් කළ නොහැකි)", p:"mʌʧ", ex:"Too much water", es:"වතුර ගොඩක් වැඩි"},
+    {e:"Any", s:"ඕනෑම/කිසිම", p:"ˈɛni", ex:"Any problem", es:"මොකක් හරි ප්‍රශ්නයක්ද"},
+
+    // DAY 17: පිහිටීම (Prepositions)
+    {e:"In", s:"ඇතුලේ", p:"ɪn", ex:"In the box", es:"පෙට්ටිය ඇතුලේ"},
+    {e:"On", s:"උඩ", p:"ɒn", ex:"On the table", es:"මේසය උඩ"},
+    {e:"At", s:"ළඟ/දිහා (ස්ථානය)", p:"æt", ex:"At home", es:"ගෙදර ඉන්නවා"},
+    {e:"Under", s:"යට", p:"ˈʌndə", ex:"Under the tree", es:"ගස යට"},
+    {e:"Up", s:"ඉහළ", p:"ʌp", ex:"Go up", es:"උඩට යන්න"},
+    {e:"Down", s:"පහළ", p:"daʊn", ex:"Sit down", es:"පහළින් වාඩිවෙන්න"},
+    {e:"Near", s:"ළඟ/ආසන්නයේ", p:"nɪə", ex:"Near the shop", es:"කඩේ ළඟ"},
+    {e:"Far", s:"දුර", p:"fɑː", ex:"Far away", es:"ගොඩක් ඈත"},
+    {e:"With", s:"සමග", p:"wɪð", ex:"Come with me", es:"මාත් එක්ක එන්න"},
+    {e:"From", s:"සිට", p:"frɒm", ex:"From Colombo", es:"කොළඹ සිට"},
+
+    // DAY 18: සාමාන්‍ය වස්තූන් (Common Objects)
+    {e:"Pen", s:"පෑන", p:"pɛn", ex:"Blue pen", es:"නිල් පෑනක්"},
+    {e:"Phone", s:"දුරකථනය", p:"fəʊn", ex:"My phone", es:"මගේ පෝන් එක"},
+    {e:"Key", s:"යතුර", p:"kiː", ex:"Car key", es:"කාර් එකේ යතුර"},
+    {e:"Box", s:"පෙට්ටිය", p:"bɒks", ex:"Open the box", es:"පෙට්ටිය අරින්න"},
+    {e:"Cup", s:"කෝප්පය", p:"kʌp", ex:"Cup of tea", es:"තේ කෝප්පයක්"},
+    {e:"Glass", s:"වීදුරුව", p:"glɑːs", ex:"Glass of water", es:"වතුර වීදුරුවක්"},
+    {e:"Plate", s:"පිඟාන", p:"pleɪt", ex:"Clean plate", es:"පිරිසිදු පිඟානක්"},
+    {e:"Knife", s:"පිහිය", p:"naɪf", ex:"Sharp knife", es:"මුවහත් පිහියක්"},
+    {e:"Spoon", s:"හැන්ද", p:"spuːn", ex:"Use a spoon", es:"හැන්දක් පාවිච්චි කරන්න"},
+    {e:"Paper", s:"කඩදාසිය", p:"ˈpeɪpə", ex:"Write on paper", es:"කොළයක ලියන්න"},
+
+    // DAY 19: සම්බන්ධක වචන (Connecting Words)
+    {e:"And", s:"සහ", p:"ænd", ex:"You and me", es:"ඔයයි මමයි"},
+    {e:"But", s:"නමුත්", p:"bʌt", ex:"Small but strong", es:"පොඩි උනාට හයියයි"},
+    {e:"Or", s:"හෝ/නැත්නම්", p:"ɔː", ex:"Tea or coffee", es:"තේ ද නැත්නම් කෝපි ද"},
+    {e:"Because", s:"මොකද/නිසා", p:"bɪˈkɒz", ex:"Because I am sick", es:"මොකද මම අසනීපෙන්"},
+    {e:"So", s:"ඒ නිසා", p:"səʊ", ex:"So I went home", es:"ඒ නිසා මම ගෙදර ගියා"},
+    {e:"If", s:"නම්", p:"ɪf", ex:"If you can", es:"ඔයාට පුළුවන් නම්"},
+    {e:"Now", s:"දැන්", p:"naʊ", ex:"Do it now", es:"දැන්ම කරන්න"},
+    {e:"Then", s:"ඊට පස්සේ/එහෙනම්", p:"ðɛn", ex:"See you then", es:"එහෙනම් පස්සේ හම්බවෙමු"},
+    {e:"Very", s:"ගොඩක් (විශේෂණ)", p:"ˈvɛri", ex:"Very good", es:"ගොඩක් හොඳයි"},
+    {e:"Too", s:"ද/වගේම/වැඩියි", p:"tuː", ex:"Me too", es:"මමත් (මටත් එහෙමයි)"},
+
+    // DAY 20: විස්තර කිරීම් - 2 (Adjectives 2)
+    {e:"Fast", s:"වේගවත්", p:"fɑːst", ex:"Fast car", es:"වේගවත් කාර් එකක්"},
+    {e:"Slow", s:"හිමින්", p:"sləʊ", ex:"Slow turtle", es:"හිමින් යන ඉබි කෙනෙක්"},
+    {e:"Easy", s:"ලේසියි", p:"ˈiːzi", ex:"Easy job", es:"ලේසි වැඩක් (රස්සාවක්)"},
+    {e:"Hard", s:"අමාරුයි/තදයි", p:"hɑːd", ex:"Hard work", es:"අමාරු වැඩක්"},
+    {e:"Soft", s:"මෘදුයි", p:"sɒft", ex:"Soft pillow", es:"මෘදු කොට්ටයක්"},
+    {e:"Heavy", s:"බරයි", p:"ˈhɛvi", ex:"Heavy bag", es:"බර බෑගයක්"},
+    {e:"Light", s:"බර අඩු/සැහැල්ලු", p:"laɪt", ex:"Light feather", es:"සැහැල්ලු පිහාටුවක්"},
+    {e:"Full", s:"පිරුණු", p:"fʊl", ex:"Full glass", es:"පිරුණු වීදුරුවක්"},
+    {e:"Empty", s:"හිස්", p:"ˈɛmpti", ex:"Empty box", es:"හිස් පෙට්ටියක්"},
+    {e:"Right", s:"හරි/දකුණ", p:"raɪt", ex:"That is right", es:"ඒක හරි"}
+);
+
+/* --- PART 4: WORDS 201 - 300 (Days 21-30) --- */
+fullData.push(
+    // DAY 21: තාක්ෂණය (Technology)
+    {e:"Computer", s:"පරිගණකය", p:"kəmˈpjuːtə", ex:"Use the computer", es:"පරිගණකය පාවිච්චි කරන්න"},
+    {e:"Internet", s:"අන්තර්ජාලය", p:"ˈɪntəˌnɛt", ex:"Fast internet", es:"වේගවත් අන්තර්ජාලය"},
+    {e:"Call", s:"ඇමතුම/කතා කරනවා", p:"kɔːl", ex:"Call me later", es:"මට පස්සේ කතා කරන්න"},
+    {e:"Message", s:"පණිවිඩය", p:"ˈmɛsɪʤ", ex:"Send a message", es:"පණිවිඩයක් යවන්න"},
+    {e:"Number", s:"අංකය", p:"ˈnʌmbə", ex:"Phone number", es:"දුරකථන අංකය"},
+    {e:"Photo", s:"ඡායාරූපය", p:"ˈfəʊtəʊ", ex:"Take a photo", es:"ෆොටෝ එකක් ගන්න"},
+    {e:"Video", s:"වීඩියෝව", p:"ˈvɪdɪəʊ", ex:"Watch video", es:"වීඩියෝ බලන්න"},
+    {e:"Game", s:"ක්‍රීඩාව (Game)", p:"geɪm", ex:"Play a game", es:"ගේම් එකක් සෙල්ලම් කරන්න"},
+    {e:"Song", s:"සිංදුව", p:"sɒŋ", ex:"Sing a song", es:"සිංදුවක් කියන්න"},
+    {e:"Movie", s:"චිත්‍රපටිය", p:"ˈmuːvi", ex:"Good movie", es:"හොඳ චිත්‍රපටියක්"},
+
+    // DAY 22: සෞඛ්‍යය (Health)
+    {e:"Medicine", s:"බෙහෙත්", p:"ˈmɛdsɪn", ex:"Take medicine", es:"බෙහෙත් ගන්න (බොන්න)"},
+    {e:"Pain", s:"වේදනාව/කැක්කුම", p:"peɪn", ex:"Back pain", es:"කොන්දේ කැක්කුම"},
+    {e:"Blood", s:"ලේ", p:"blʌd", ex:"Red blood", es:"රතු පාට ලේ"},
+    {e:"Help", s:"උදව්", p:"hɛlp", ex:"I need help", es:"මට උදව් ඕනා"},
+    {e:"Life", s:"ජීවිතය", p:"laɪf", ex:"Happy life", es:"සතුටු ජීවිතයක්"},
+    {e:"Die", s:"මැරෙනවා", p:"daɪ", ex:"Flowers die", es:"මල් මැරෙනවා (පරවෙනවා)"},
+    {e:"Born", s:"ඉපදුනා", p:"bɔːn", ex:"Baby is born", es:"බබෙක් ඉපදුනා"},
+    {e:"Strong", s:"ශක්තිමත්", p:"strɒŋ", ex:"Be strong", es:"ශක්තිමත්ව ඉන්න"},
+    {e:"Weak", s:"දුර්වල", p:"wiːk", ex:"I feel weak", es:"මට පණ නෑ වගේ (දුර්වලයි)"},
+    {e:"Body", s:"ශරීරය", p:"ˈbɒdi", ex:"Healthy body", es:"නිරෝගී ශරීරයක්"},
+
+    // DAY 23: කාලය මැනීම (Time & Calendar)
+    {e:"Week", s:"සතිය", p:"wiːk", ex:"Next week", es:"ලබන සතියේ"},
+    {e:"Month", s:"මාසය", p:"mʌnθ", ex:"Last month", es:"ගිය මාසයේ"},
+    {e:"Year", s:"අවුරුද්ද", p:"jɪə", ex:"New year", es:"අලුත් අවුරුද්ද"},
+    {e:"Minute", s:"විනාඩිය", p:"ˈmɪnɪt", ex:"Wait a minute", es:"විනාඩියක් ඉන්න"},
+    {e:"Hour", s:"පැය", p:"ˈaʊə", ex:"One hour", es:"එක පැයක්"},
+    {e:"Morning", s:"උදෑසන", p:"ˈmɔːnɪŋ", ex:"Good morning", es:"සුබ උදෑසනක්"},
+    {e:"Evening", s:"සවස", p:"ˈiːvnɪŋ", ex:"Good evening", es:"සුබ සැන්දෑවක්"},
+    {e:"Night", s:"රාත්‍රිය", p:"naɪt", ex:"Good night", es:"සුබ රාත්‍රියක්"},
+    {e:"Date", s:"දිනය", p:"deɪt", ex:"What is the date", es:"අද දිනය මොකක්ද"},
+    {e:"Age", s:"වයස", p:"eɪʤ", ex:"What is your age", es:"ඔයාගේ වයස කීයද"},
+
+    // DAY 24: ක්‍රියාපද - 2 (Action Verbs)
+    {e:"Fly", s:"පියාඹනවා", p:"flaɪ", ex:"Birds fly", es:"කුරුල්ලෝ පියාඹනවා"},
+    {e:"Swim", s:"පීනනවා", p:"swɪm", ex:"Swim in sea", es:"මුහුදේ පීනන්න"},
+    {e:"Jump", s:"පනිනවා", p:"ʤʌmp", ex:"Jump high", es:"උඩ පනින්න"},
+    {e:"Dance", s:"නටනවා", p:"dɑːns", ex:"Let us dance", es:"අපි නටමු"},
+    {e:"Sing", s:"සිංදු කියනවා", p:"sɪŋ", ex:"Sing a song", es:"සිංදුවක් කියන්න"},
+    {e:"Cry", s:"අඬනවා", p:"kraɪ", ex:"Do not cry", es:"අඬන්න එපා"},
+    {e:"Laugh", s:"හිනාවෙනවා", p:"lɑːf", ex:"Laugh loud", es:"හයියෙන් හිනාවෙන්න"},
+    {e:"Smile", s:"හිනා (මුවින්)", p:"smaɪl", ex:"Nice smile", es:"ලස්සන හිනාවක්"},
+    {e:"Ask", s:"අහනවා/ඉල්ලනවා", p:"ɑːsk", ex:"Ask a question", es:"ප්‍රශ්නයක් අහන්න"},
+    {e:"Answer", s:"පිළිතුරු දෙනවා", p:"ˈɑːnsə", ex:"Answer me", es:"මට උත්තර දෙන්න"},
+
+    // DAY 25: පුද්ගල ස්වභාවයන් (Describing People)
+    {e:"Tall", s:"උස", p:"tɔːl", ex:"Tall man", es:"උස මිනිහෙක්"},
+    {e:"Short", s:"මිටි/කෙටි", p:"ʃɔːt", ex:"Short hair", es:"කොට කොණ්ඩයක්"},
+    {e:"Fat", s:"මහත", p:"fæt", ex:"Fat cat", es:"මහත පූසෙක්"},
+    {e:"Thin", s:"කෙට්ටු", p:"θɪn", ex:"Thin boy", es:"කෙට්ටු පිරිමි ළමයෙක්"},
+    {e:"Young", s:"තරුණ/බාල", p:"jʌŋ", ex:"Young girl", es:"තරුණ ගැහැණු ළමයෙක්"},
+    {e:"Rich", s:"පොහොසත්", p:"rɪʧ", ex:"Rich man", es:"පොහොසත් මිනිහෙක්"},
+    {e:"Poor", s:"දුප්පත්", p:"pʊə", ex:"Poor people", es:"දුප්පත් මිනිස්සු"},
+    {e:"Smart", s:"බුද්ධිමත්", p:"smɑːt", ex:"Smart student", es:"දක්ෂ ළමයෙක්"},
+    {e:"Kind", s:"කරුණාවන්ත", p:"kaɪnd", ex:"Kind heart", es:"කරුණාවන්ත හදවතක්"},
+    {e:"Bad", s:"නරක", p:"bæd", ex:"Bad habit", es:"නරක පුරුද්දක්"},
+
+    // DAY 26: නගරයේ දේවල් (City Life)
+    {e:"Street", s:"වීදිය/පාර", p:"striːt", ex:"Cross the street", es:"පාර පනින්න"},
+    {e:"Building", s:"ගොඩනැගිල්ල", p:"ˈbɪldɪŋ", ex:"Tall building", es:"උස ගොඩනැගිල්ලක්"},
+    {e:"Bridge", s:"පාලම", p:"brɪʤ", ex:"Long bridge", es:"දිග පාලමක්"},
+    {e:"Market", s:"වෙළඳපොළ", p:"ˈmɑːkɪt", ex:"Go to market", es:"පොළට යන්න"},
+    {e:"Hotel", s:"හෝටලය", p:"həʊˈtɛl", ex:"Nice hotel", es:"ලස්සන හෝටලයක්"},
+    {e:"Airport", s:"ගුවන් තොටුපොළ", p:"ˈeəpɔːt", ex:"To the airport", es:"එයාර්පෝට් එකට"},
+    {e:"Place", s:"ස්ථානය", p:"pleɪs", ex:"Nice place", es:"ලස්සන තැනක්"},
+    {e:"Center", s:"මැද/මධ්‍යස්ථානය", p:"ˈsɛntə", ex:"City center", es:"නගර මධ්‍යය"},
+    {e:"Side", s:"පැත්ත", p:"saɪd", ex:"Right side", es:"දකුණු පැත්ත"},
+    {e:"Corner", s:"මුල්ල", p:"ˈkɔːnə", ex:"Street corner", es:"පාරේ මුල්ල"},
+
+    // DAY 27: නාන කාමරය සහ පිරිසිදුකම (Toiletries)
+    {e:"Soap", s:"සබන්", p:"səʊp", ex:"Wash with soap", es:"සබන් දාලා හෝදන්න"},
+    {e:"Towel", s:"තුවාය", p:"ˈtaʊəl", ex:"Dry towel", es:"වියළි තුවායක්"},
+    {e:"Brush", s:"බුරුසුව", p:"brʌʃ", ex:"Tooth brush", es:"දත් බුරුසුව"},
+    {e:"Comb", s:"පනාව", p:"kəʊm", ex:"Comb hair", es:"කොණ්ඩේ පීරන්න"},
+    {e:"Mirror", s:"කණ්ණාඩිය", p:"ˈmɪrə", ex:"Look in mirror", es:"කණ්ණාඩිය බලන්න"},
+    {e:"Toilet", s:"වැසිකිළිය", p:"ˈtɔɪlɪt", ex:"Go to toilet", es:"වැසිකිළියට යන්න"},
+    {e:"Shower", s:"නාන එක (Shower)", p:"ˈʃaʊə", ex:"Take a shower", es:"ඇඟ හෝදගන්න (ෂවර් එකෙන්)"},
+    {e:"Dirty", s:"කිලිටි", p:"ˈdɜːti", ex:"Dirty clothes", es:"කිලිටි ඇඳුම්"},
+    {e:"Clean", s:"පිරිසිදු", p:"kliːn", ex:"Clean hands", es:"පිරිසිදු අත්"},
+    {e:"Dry", s:"වියළි", p:"draɪ", ex:"Dry hair", es:"වියළි කොණ්ඩයක්"},
+
+    // DAY 28: අදහස් (Abstract Concepts)
+    {e:"Love", s:"ආදරය", p:"lʌv", ex:"I love you", es:"මම ඔයාට ආදරෙයි"},
+    {e:"Hate", s:"වෛරය/අකමැත්ත", p:"heɪt", ex:"I hate lies", es:"මම බොරුවට කැමති නෑ"},
+    {e:"Hope", s:"බලාපොරොත්තුව", p:"həʊp", ex:"I have hope", es:"මට බලාපොරොත්තුවක් තියෙනවා"},
+    {e:"Fear", s:"බිය", p:"fɪə", ex:"No fear", es:"බය වෙන්න එපා"},
+    {e:"Idea", s:"අදහස", p:"aɪˈdɪə", ex:"Good idea", es:"හොඳ අදහසක්"},
+    {e:"Dream", s:"සිහිනය", p:"driːm", ex:"Sweet dream", es:"සුබ සිහිනයක්"},
+    {e:"Mind", s:"මනස/හිත", p:"maɪnd", ex:"Open mind", es:"විවෘත මනසක්"},
+    {e:"Word", s:"වචනය", p:"wɜːd", ex:"One word", es:"එක වචනයක්"},
+    {e:"Name", s:"නම", p:"neɪm", ex:"Your name", es:"ඔයාගේ නම"},
+    {e:"Voice", s:"කටහඬ", p:"vɔɪs", ex:"Loud voice", es:"හයිය කටහඬක්"},
+
+    // DAY 29: ප්‍රමාණ සහ අනුපිළිවෙල (Quantity)
+    {e:"All", s:"ඔක්කොම", p:"ɔːl", ex:"All people", es:"හැමෝම (ඔක්කොම මිනිස්සු)"},
+    {e:"Some", s:"ටිකක්/සමහර", p:"sʌm", ex:"Some water", es:"වතුර ටිකක්"},
+    {e:"Half", s:"භාගයක්", p:"hɑːf", ex:"Half price", es:"භාගයක් මිල (බාගෙට)"},
+    {e:"Quarter", s:" කාලක්", p:"ˈkwɔːtə", ex:"Quarter past", es:"කාලයි (වෙලාව)"},
+    {e:"First", s:"පළමු", p:"fɜːst", ex:"First prize", es:"පළමු තෑග්ග"},
+    {e:"Last", s:"අවසාන", p:"lɑːst", ex:"Last bus", es:"අන්තිම බස් එක"},
+    {e:"Next", s:"ඊළඟ", p:"nɛkst", ex:"Next time", es:"ඊළඟ පාර"},
+    {e:"More", s:"තව/වැඩිපුර", p:"mɔː", ex:"More rice", es:"තව බත්"},
+    {e:"Less", s:"අඩු", p:"lɛs", ex:"Less sugar", es:"සීනි අඩුවෙන්"},
+    {e:"Lot", s:"ගොඩක්", p:"lɒt", ex:"A lot of money", es:"සල්ලි ගොඩක්"},
+
+    // DAY 30: ප්‍රයෝජනවත් වචන (Useful Words)
+    {e:"Way", s:"ක්‍රමය/පාර", p:"weɪ", ex:"This way", es:"මේ පැත්තෙන්"},
+    {e:"Thing", s:"දේ/භාණ්ඩය", p:"θɪŋ", ex:"Good thing", es:"හොඳ දෙයක්"},
+    {e:"Problem", s:"ප්‍රශ්නය", p:"ˈprɒbləm", ex:"No problem", es:"ප්‍රශ්නයක් නෑ"},
+    {e:"Example", s:"උදාහරණය", p:"ɪgˈzɑːmpl", ex:"For example", es:"උදාහරණයක් විදිහට"},
+    {e:"Part", s:"කොටස", p:"pɑːt", ex:"Part one", es:"පළමු කොටස"},
+    {e:"Side", s:"පැත්ත", p:"saɪd", ex:"Left side", es:"වම් පැත්ත"},
+    {e:"Kind", s:"වර්ගය", p:"kaɪnd", ex:"What kind", es:"මොන වර්ගයේද"},
+    {e:"List", s:"ලැයිස්තුව", p:"lɪst", ex:"Make a list", es:"ලිස්ට් එකක් හදන්න"},
+    {e:"Line", s:"පේළිය/ඉර", p:"laɪn", ex:"Straight line", es:"කෙලින් ඉරක්"},
+    {e:"Point", s:"ලක්ෂ්‍යය/කාරණය", p:"pɔɪnt", ex:"Good point", es:"හොඳ කාරණයක්"}
+);
+
+/* --- PART 5: WORDS 301 - 400 (Days 31-40) --- */
+fullData.push(
+    // DAY 31: කාලගුණය සහ සොබාදහම - 2 (Nature & Weather)
+    {e:"Cloud", s:"වලාකුළ", p:"klaʊd", ex:"White cloud", es:"සුදු වලාකුළක්"},
+    {e:"Wind", s:"හුළඟ", p:"wɪnd", ex:"Strong wind", es:"තද හුළඟක්"},
+    {e:"Storm", s:"කුණාටුව", p:"stɔːm", ex:"Big storm", es:"ලොකු කුණාටුවක්"},
+    {e:"Snow", s:"හිම", p:"snəʊ", ex:"Cold snow", es:"සීතල හිම"},
+    {e:"Ice", s:"අයිස්", p:"aɪs", ex:"Ice water", es:"අයිස් වතුර"},
+    {e:"Fire", s:"ගින්දර", p:"ˈfaɪə", ex:"Hot fire", es:"රස්නේ ගින්දර"},
+    {e:"Sand", s:"වැලි", p:"sænd", ex:"Sand on beach", es:"වෙරළේ තියෙන වැලි"},
+    {e:"Beach", s:"වෙරළ", p:"biːʧ", ex:"Go to beach", es:"වෙරළට යන්න"},
+    {e:"Hill", s:"කඳු ගැටය", p:"hɪl", ex:"Up the hill", es:"කන්ද උඩට"},
+    {e:"River", s:"ගඟ", p:"ˈrɪvə", ex:"Long river", es:"දිග ගඟක්"},
+
+    // DAY 32: සත්තු - 2 (Animals)
+    {e:"Horse", s:"අශ්වයා", p:"hɔːs", ex:"Ride a horse", es:"අශ්වයෙක් පදින්න"},
+    {e:"Pig", s:"ඌරා", p:"pɪg", ex:"Fat pig", es:"මහත ඌරෙක්"},
+    {e:"Sheep", s:"බැටළුවා", p:"ʃiːp", ex:"White sheep", es:"සුදු බැටළුවෙක්"},
+    {e:"Lion", s:"සිංහයා", p:"ˈlaɪən", ex:"King lion", es:"සිංහ රජා"},
+    {e:"Tiger", s:"කොටියා", p:"ˈtaɪgə", ex:"Wild tiger", es:"කැලෑ කොටියෙක්"},
+    {e:"Monkey", s:"වඳුරා", p:"ˈmʌŋki", ex:"Funny monkey", es:"විහිළුකාර වඳුරෙක්"},
+    {e:"Mouse", s:"මීයා", p:"maʊs", ex:"Small mouse", es:"පොඩි මීයෙක්"},
+    {e:"Snake", s:"නයා/සර්පයා", p:"sneɪk", ex:"Long snake", es:"දිග සර්පයෙක්"},
+    {e:"Bear", s:"වලහා", p:"beə", ex:"Big bear", es:"ලොකු වලහෙක්"},
+    {e:"Zoo", s:"සත්වෝද්‍යානය", p:"zuː", ex:"Visit the zoo", es:"සත්වත්ත බලන්න යන්න"},
+
+    // DAY 33: කුස්සියේ උපකරණ (Kitchen Items)
+    {e:"Fork", s:"ගෑරුප්පුව", p:"fɔːk", ex:"Spoon and fork", es:"හැන්ද සහ ගෑරුප්පුව"},
+    {e:"Bowl", s:"බඳුන/කෝප්පය (ලොකු)", p:"bəʊl", ex:"Soup bowl", es:"සුප් කෝප්පයක්"},
+    {e:"Pot", s:"මුට්ටිය/වලඳ", p:"pɒt", ex:"Cooking pot", es:"උයන වලඳක්"},
+    {e:"Pan", s:"තාච්චිය", p:"pæn", ex:"Frying pan", es:"බැදුම් තාච්චිය"},
+    {e:"Bottle", s:"බෝතලය", p:"ˈbɒtl", ex:"Water bottle", es:"වතුර බෝතලයක්"},
+    {e:"Stove", s:"ලිප", p:"stəʊv", ex:"Gas stove", es:"ගෑස් ලිප"},
+    {e:"Oven", s:"උඳුන (Oven)", p:"ˈʌvn", ex:"Hot oven", es:"රස්නේ උඳුනක්"},
+    {e:"Fridge", s:"ශීතකරණය", p:"frɪʤ", ex:"In the fridge", es:"ශීතකරණය ඇතුලේ"},
+    {e:"Meal", s:"ආහාර වේල", p:"miːl", ex:"Good meal", es:"හොඳ කෑම වේලක්"},
+    {e:"Taste", s:"රස", p:"teɪst", ex:"Sweet taste", es:"පැණි රසක්"},
+
+    // DAY 34: ක්‍රීඩා සහ විනෝදාංශ (Sports)
+    {e:"Ball", s:"බෝලය", p:"bɔːl", ex:"Kick the ball", es:"බෝලෙට පයින් ගහන්න"},
+    {e:"Team", s:"කණ්ඩායම", p:"tiːm", ex:"My team", es:"මගේ කණ්ඩායම"},
+    {e:"Win", s:"දිනනවා", p:"wɪn", ex:"We win", es:"අපි දිනනවා"},
+    {e:"Lose", s:"පරදිනවා/නැතිවෙනවා", p:"luːz", ex:"Do not lose", es:"පරදින්න එපා"},
+    {e:"Game", s:"තරඟය/ක්‍රීඩාව", p:"geɪm", ex:"Start game", es:"ගේම් එක පටන් ගන්න"},
+    {e:"Player", s:"ක්‍රීඩකයා", p:"ˈpleɪə", ex:"Good player", es:"හොඳ ක්‍රීඩකයෙක්"},
+    {e:"Goal", s:"ගෝලය/ඉලක්කය", p:"gəʊl", ex:"Score a goal", es:"ගෝල් එකක් ගහන්න"},
+    {e:"Sport", s:"ක්‍රීඩාව", p:"spɔːt", ex:"I like sport", es:"මම ක්‍රීඩාවට කැමතියි"},
+    {e:"Run", s:"දුවනවා", p:"rʌn", ex:"Run fast", es:"වේගයෙන් දුවන්න"},
+    {e:"Jump", s:"පනිනවා", p:"ʤʌmp", ex:"Jump high", es:"උඩ පනින්න"},
+
+    // DAY 35: දිශාවන් (Directions)
+    {e:"North", s:"උතුර", p:"nɔːθ", ex:"North side", es:"උතුරු පැත්ත"},
+    {e:"South", s:"දකුණ (දිශාව)", p:"saʊθ", ex:"South pole", es:"දකුණු ධ්‍රැවය"},
+    {e:"East", s:"නැගෙනහිර", p:"iːst", ex:"Sun in east", es:"නැගෙනහිරින් පායන ඉර"},
+    {e:"West", s:"බටහිර", p:"wɛst", ex:"Go west", es:"බටහිරට යන්න"},
+    {e:"Left", s:"වම", p:"lɛft", ex:"Turn left", es:"වමට හැරෙන්න"},
+    {e:"Right", s:"දකුණ/හරි", p:"raɪt", ex:"Turn right", es:"දකුණට හැරෙන්න"},
+    {e:"Turn", s:"හැරෙනවා", p:"tɜːn", ex:"Turn around", es:"අනිත් පැත්ත හැරෙන්න"},
+    {e:"Map", s:"සිතියම", p:"mæp", ex:"Read the map", es:"සිතියම කියවන්න (බලන්න)"},
+    {e:"Sign", s:"ලකුණ/පුවරුව", p:"saɪn", ex:"Road sign", es:"පාරේ සලකුණක්"},
+    {e:"Cross", s:"හරහා යනවා", p:"krɒs", ex:"Cross the road", es:"පාර පනින්න"},
+
+    // DAY 36: ක්‍රියා විශේෂණ (Adverbs of Frequency)
+    {e:"Often", s:"නිතරම/බොහෝවිට", p:"ˈɒf(ə)n", ex:"I often walk", es:"මම නිතරම ඇවිදිනවා"},
+    {e:"Sometimes", s:"සමහරවිට", p:"ˈsʌmtaɪmz", ex:"Sometimes I cry", es:"සමහර වෙලාවට මම අඬනවා"},
+    {e:"Usually", s:"සාමාන්‍යයෙන්", p:"ˈjuːʒʊəli", ex:"Usually happy", es:"සාමාන්‍යයෙන් සතුටින්"},
+    {e:"Rarely", s:"කලාතුරකින්", p:"ˈreəli", ex:"Rarely see him", es:"කලාතුරකින් ඔහුව දකින්නේ"},
+    {e:"Daily", s:"දිනපතා", p:"ˈdeɪli", ex:"Daily news", es:"දිනපතා පුවත්"},
+    {e:"Weekly", s:"සතිපතා", p:"ˈwiːkli", ex:"Weekly meeting", es:"සතිපතා රැස්වීම"},
+    {e:"Once", s:"එක පාරක්", p:"wʌns", ex:"Once a day", es:"දවසට එක පාරක්"},
+    {e:"Twice", s:"දෙපාරක්", p:"twaɪs", ex:"Twice a week", es:"සතියට දෙපාරක්"},
+    {e:"Soon", s:"ලඟදීම/ඉක්මනින්", p:"suːn", ex:"See you soon", es:"ලඟදීම හමුවෙමු"},
+    {e:"Again", s:"නැවත/ආයේ", p:"əˈgɛn", ex:"Try again", es:"ආයේ උත්සාහ කරන්න"},
+
+    // DAY 37: පාසල සහ අධ්‍යාපනය (Education)
+    {e:"Class", s:"පන්තිය", p:"klɑːs", ex:"In the class", es:"පන්තිය ඇතුලේ"},
+    {e:"Exam", s:"විභාගය", p:"ɪgˈzæm", ex:"Pass exam", es:"විභාගය පාස් වෙන්න"},
+    {e:"Study", s:"පාඩම් කරනවා", p:"ˈstʌdi", ex:"Study hard", es:"මහන්සි වී පාඩම් කරන්න"},
+    {e:"Learn", s:"ඉගෙන ගන්නවා", p:"lɜːn", ex:"Learn English", es:"ඉංග්‍රීසි ඉගෙන ගන්න"},
+    {e:"Write", s:"ලියනවා", p:"raɪt", ex:"Write a letter", es:"ලිපියක් ලියන්න"},
+    {e:"Read", s:"කියවනවා", p:"riːd", ex:"Read books", es:"පොත් කියවන්න"},
+    {e:"Desk", s:"ඩෙස්ක් එක", p:"dɛsk", ex:"Sit at desk", es:"ඩෙස්ක් එකේ වාඩිවෙන්න"},
+    {e:"Board", s:"පුවරුව", p:"bɔːd", ex:"White board", es:"සුදු පුවරුව"},
+    {e:"Lesson", s:"පාඩම", p:"ˈlɛsn", ex:"First lesson", es:"පළමු පාඩම"},
+    {e:"Rule", s:"නීතිය", p:"ruːl", ex:"Follow rule", es:"නීතිය පිළිපදින්න"},
+
+    // DAY 38: ද්‍රව්‍ය (Materials)
+    {e:"Wood", s:"ලී", p:"wʊd", ex:"Made of wood", es:"ලීයෙන් හදපු"},
+    {e:"Iron", s:"යකඩ", p:"ˈaɪən", ex:"Strong iron", es:"ශක්තිමත් යකඩ"},
+    {e:"Gold", s:"රත්තරන්", p:"gəʊld", ex:"Gold ring", es:"රත්තරන් මුද්දක්"},
+    {e:"Silver", s:"රිදී", p:"ˈsɪlvə", ex:"Silver spoon", es:"රිදී හැන්දක්"},
+    {e:"Plastic", s:"ප්ලාස්ටික්", p:"ˈplæstɪk", ex:"Plastic bag", es:"ප්ලාස්ටික් බෑගයක්"},
+    {e:"Glass", s:"වීදුරු", p:"glɑːs", ex:"Glass window", es:"වීදුරු ජනේලයක්"},
+    {e:"Paper", s:"කඩදාසි", p:"ˈpeɪpə", ex:"White paper", es:"සුදු කඩදාසියක්"},
+    {e:"Metal", s:"ලෝහ", p:"ˈmɛtl", ex:"Hard metal", es:"තද ලෝහයක්"},
+    {e:"Stone", s:"ගල්", p:"stəʊn", ex:"Throw a stone", es:"ගලක් විසි කරන්න"},
+    {e:"Cotton", s:"කපු", p:"ˈkɒtn", ex:"Cotton shirt", es:"කපු කමිසයක්"},
+
+    // DAY 39: සමාජය සහ කලාව (Society & Abstract)
+    {e:"Art", s:"කලාව", p:"ɑːt", ex:"I like art", es:"මම කලාවට කැමතියි"},
+    {e:"Music", s:"සංගීතය", p:"ˈmjuːzɪk", ex:"Loud music", es:"ඝෝෂාකාරී සංගීතය"},
+    {e:"History", s:"ඉතිහාසය", p:"ˈhɪstəri", ex:"World history", es:"ලෝක ඉතිහාසය"},
+    {e:"Story", s:"කතාව", p:"ˈstɔːri", ex:"Tell a story", es:"කතාවක් කියන්න"},
+    {e:"News", s:"පුවත්", p:"njuːz", ex:"Good news", es:"හොඳ ප්‍රවෘත්තියක්"},
+    {e:"War", s:"යුද්ධය", p:"wɔː", ex:"Stop war", es:"යුද්ධය නවත්වන්න"},
+    {e:"Peace", s:"සාමය", p:"piːs", ex:"We need peace", es:"අපට සාමය අවශ්‍යයි"},
+    {e:"Law", s:"නීතිය", p:"lɔː", ex:"Obey the law", es:"නීතියට ගරු කරන්න"},
+    {e:"Power", s:"බලය", p:"ˈpaʊə", ex:"Electric power", es:"විදුලි බලය"},
+    {e:"World", s:"ලෝකය", p:"wɜːld", ex:"Big world", es:"ලොකු ලෝකයක්"},
+
+    // DAY 40: තවත් ක්‍රියාපද (Common Verbs)
+    {e:"Believe", s:"විශ්වාස කරනවා", p:"bɪˈliːv", ex:"Believe me", es:"මාව විශ්වාස කරන්න"},
+    {e:"Understand", s:"තේරුම් ගන්නවා", p:"ˌʌndəˈstænd", ex:"I understand", es:"මට තේරෙනවා"},
+    {e:"Remember", s:"මතක තියාගන්නවා", p:"rɪˈmɛmbə", ex:"Remember this", es:"මේක මතක තියාගන්න"},
+    {e:"Forget", s:"අමතක කරනවා", p:"fəˈgɛt", ex:"Do not forget", es:"අමතක කරන්න එපා"},
+    {e:"Meet", s:"හමුවෙනවා", p:"miːt", ex:"Nice to meet", es:"හමුවීම සතුටක්"},
+    {e:"Wait", s:"බලාගෙන ඉන්නවා", p:"weɪt", ex:"Wait for me", es:"මම එනකන් ඉන්න"},
+    {e:"Hope", s:"බලාපොරොත්තු වෙනවා", p:"həʊp", ex:"I hope so", es:"මම එහෙම බලාපොරොත්තු වෙනවා"},
+    {e:"Change", s:"වෙනස් කරනවා/වෙනවා", p:"ʧeɪnʤ", ex:"Change clothes", es:"ඇඳුම් මාරු කරන්න"},
+    {e:"Start", s:"පටන් ගන්නවා", p:"stɑːt", ex:"Start now", es:"දැන් පටන් ගන්න"},
+    {e:"Finish", s:"අවසන් කරනවා", p:"ˈfɪnɪʃ", ex:"Finish work", es:"වැඩ ඉවර කරන්න"}
+);
+
+/* --- PART 6: WORDS 401 - 500 (Days 41-50) --- */
+fullData.push(
+    // DAY 41: විස්තර කිරීම් - 3 (Physical Adjectives)
+    {e:"Bright", s:"දීප්තිමත්/එළියයි", p:"braɪt", ex:"Bright sun", es:"දීප්තිමත් ඉරක්"},
+    {e:"Dark", s:"අඳුරුයි", p:"dɑːk", ex:"Dark room", es:"අඳුරු කාමරයක්"},
+    {e:"Sharp", s:"මුවහත්/තියුණු", p:"ʃɑːp", ex:"Sharp knife", es:"මුවහත් පිහියක්"},
+    {e:"Dull", s:"මොට/අඳුරු", p:"dʌl", ex:"Dull blade", es:"මොට තලයක්"},
+    {e:"Smooth", s:"සිනිඳු/සුමට", p:"smuːð", ex:"Smooth skin", es:"සිනිඳු හමක්"},
+    {e:"Rough", s:"රළු", p:"rʌf", ex:"Rough road", es:"රළු පාරක්"},
+    {e:"Thick", s:"ඝනකම", p:"θɪk", ex:"Thick book", es:"ඝනකම පොතක්"},
+    {e:"Thin", s:"සිහින්/තුනී", p:"θɪn", ex:"Thin paper", es:"තුනී කොළයක්"},
+    {e:"Wide", s:"පළල", p:"waɪd", ex:"Wide river", es:"පළල ගඟක්"},
+    {e:"Narrow", s:"පටු", p:"ˈnærəʊ", ex:"Narrow path", es:"පටු පාරක්"},
+
+    // DAY 42: නිවසේ කොටස් (Parts of House)
+    {e:"Roof", s:"වහලය", p:"ruːf", ex:"Red roof", es:"රතු පාට වහලය"},
+    {e:"Floor", s:"පොළව/බිම", p:"flɔː", ex:"Clean floor", es:"පිරිසිදු පොළව"},
+    {e:"Wall", s:"බිත්තිය", p:"wɔːl", ex:"White wall", es:"සුදු පාට බිත්තිය"},
+    {e:"Gate", s:"ගේට්ටුව", p:"geɪt", ex:"Open gate", es:"ගේට්ටුව අරින්න"},
+    {e:"Garden", s:"වත්ත", p:"ˈgɑːdn", ex:"Big garden", es:"ලොකු වත්තක්"},
+    {e:"Lock", s:"ඉබි යතුර", p:"lɒk", ex:"Key and lock", es:"යතුර සහ ඉබි යතුර"},
+    {e:"Lamp", s:"ලාම්පුව", p:"læmp", ex:"Light the lamp", es:"ලාම්පුව පත්තු කරන්න"},
+    {e:"Fan", s:"විදුලි පංකාව", p:"fæn", ex:"Turn on fan", es:"ෆෑන් එක දාන්න"},
+    {e:"Mat", s:"පැදුර", p:"mæt", ex:"Sit on mat", es:"පැදුරේ වාඩිවෙන්න"},
+    {e:"Step", s:"පඩිය", p:"stɛp", ex:"Watch the step", es:"පඩිය බලාගෙන (පරිස්සමින්)"},
+
+    // DAY 43: මුදල් සහ ව්‍යාපාර (Money & Business)
+    {e:"Price", s:"මිල", p:"praɪs", ex:"Good price", es:"හොඳ මිලක්"},
+    {e:"Cost", s:"වියදම/වටිනාකම", p:"kɒst", ex:"High cost", es:"ලොකු වියදමක්"},
+    {e:"Pay", s:"ගෙවනවා", p:"peɪ", ex:"Pay money", es:"සල්ලි ගෙවන්න"},
+    {e:"Bill", s:"බිල", p:"bɪl", ex:"Pay the bill", es:"බිල ගෙවන්න"},
+    {e:"Cash", s:"අතේ ඇති මුදල්", p:"kæʃ", ex:"Pay by cash", es:"අතේ තියෙන සල්ලි වලින් ගෙවන්න"},
+    {e:"Save", s:"ඉතුරු කරනවා", p:"seɪv", ex:"Save money", es:"සල්ලි ඉතුරු කරන්න"},
+    {e:"Spend", s:"වියදම් කරනවා", p:"spɛnd", ex:"Spend time", es:"කාලය ගත කරන්න (වියදම් කරන්න)"},
+    {e:"Sell", s:"විකුණනවා", p:"sɛl", ex:"Sell cars", es:"කාර් විකුණන්න"},
+    {e:"Buy", s:"මිලදී ගන්නවා", p:"baɪ", ex:"Buy food", es:"කෑම ගන්න"},
+    {e:"Sale", s:"විකිණීම/සේල්", p:"seɪl", ex:"For sale", es:"විකිණීමට ඇත"},
+
+    // DAY 44: හැඩතල සහ ප්‍රමාණ (Shapes & Sizes)
+    {e:"Round", s:"රවුම්", p:"raʊnd", ex:"Round ball", es:"රවුම් බෝලයක්"},
+    {e:"Square", s:"කොටු", p:"skweə", ex:"Square box", es:"කොටු පෙට්ටියක්"},
+    {e:"Circle", s:"වෘත්තය", p:"ˈsɜːkl", ex:"Draw a circle", es:"වෘත්තයක් අඳින්න"},
+    {e:"Line", s:"ඉර/රේඛාව", p:"laɪn", ex:"Straight line", es:"කෙලින් ඉරක්"},
+    {e:"Dot", s:"තිත", p:"dɒt", ex:"Red dot", es:"රතු පාට තිතක්"},
+    {e:"Hole", s:"සිල", p:"həʊl", ex:"Deep hole", es:"ගැඹුරු වලක් (සිලක්)"},
+    {e:"Top", s:"උඩ/මුදුන", p:"tɒp", ex:"Top of hill", es:"කන්ද මුදුන"},
+    {e:"Bottom", s:"යට/පතුල", p:"ˈbɒtəm", ex:"Bottom of sea", es:"මුහුදේ පතුල"},
+    {e:"Middle", s:"මැද", p:"ˈmɪdl", ex:"In the middle", es:"හරියටම මැද"},
+    {e:"Edge", s:"අයින/දාරය", p:"ɛʤ", ex:"Edge of table", es:"මේසයේ අයින"},
+
+    // DAY 45: චලනයන් - 1 (Movement Verbs)
+    {e:"Push", s:"තල්ලු කරනවා", p:"pʊʃ", ex:"Push the door", es:"දොර තල්ලු කරන්න"},
+    {e:"Pull", s:"අදිනවා", p:"pʊl", ex:"Pull the rope", es:"ලණුව අදින්න"},
+    {e:"Throw", s:"විසි කරනවා", p:"θrəʊ", ex:"Throw ball", es:"බෝලය විසි කරන්න"},
+    {e:"Catch", s:"අල්ලනවා", p:"kæʧ", ex:"Catch the ball", es:"බෝලය අල්ලගන්න"},
+    {e:"Hit", s:"ගහනවා/වදිනවා", p:"hɪt", ex:"Hit the wall", es:"බිත්තියේ වදිනවා"},
+    {e:"Kick", s:"පයින් ගහනවා", p:"kɪk", ex:"Kick the ball", es:"බෝලෙට පයින් ගහන්න"},
+    {e:"Lift", s:"ඔසවනවා", p:"lɪft", ex:"Lift the box", es:"පෙට්ටිය උස්සන්න"},
+    {e:"Drop", s:"අතහරිනවා/වැටෙනවා", p:"drɒp", ex:"Do not drop", es:"බිම දාන්න එපා (අතහරින්න එපා)"},
+    {e:"Fall", s:"වැටෙනවා", p:"fɔːl", ex:"Leaves fall", es:"කොළ වැටෙනවා"},
+    {e:"Hold", s:"අල්ලන් ඉන්නවා", p:"həʊld", ex:"Hold my hand", es:"මගේ අතින් අල්ලගන්න"},
+
+    // DAY 46: අදහස් හුවමාරුව (Communication)
+    {e:"Talk", s:"කතා කරනවා", p:"tɔːk", ex:"Talk to me", es:"මාත් එක්ක කතා කරන්න"},
+    {e:"Say", s:"කියනවා", p:"seɪ", ex:"Say hello", es:"හලෝ කියන්න"},
+    {e:"Tell", s:"කියනවා (කෙනෙක්ට)", p:"tɛl", ex:"Tell a story", es:"කතාවක් කියන්න"},
+    {e:"Shout", s:"කෑගහනවා", p:"ʃaʊt", ex:"Do not shout", es:"කෑගහන්න එපා"},
+    {e:"Whisper", s:"කොඳුරනවා", p:"ˈwɪspə", ex:"Whisper to me", es:"මට හිමින් කියන්න (කොඳුරන්න)"},
+    {e:"Discuss", s:"සාකච්ඡා කරනවා", p:"dɪsˈkʌs", ex:"Discuss plans", es:"ප්ලෑන් ගැන සාකච්ඡා කරන්න"},
+    {e:"Explain", s:"පැහැදිලි කරනවා", p:"ɪksˈpleɪn", ex:"Explain this", es:"මේක පැහැදිලි කරන්න"},
+    {e:"Mean", s:"අදහස් කරනවා", p:"miːn", ex:"What do you mean", es:"ඔයා මොකක්ද අදහස් කරන්නේ"},
+    {e:"Promise", s:"පොරාන්දු වෙනවා", p:"ˈprɒmɪs", ex:"I promise", es:"මම පොරොන්දු වෙනවා"},
+    {e:"Agree", s:"එකඟ වෙනවා", p:"əˈgriː", ex:"I agree", es:"මම එකඟයි"},
+
+    // DAY 47: මිනිස්සු සහ සමාජය (People & Roles)
+    {e:"King", s:"රජතුමා", p:"kɪŋ", ex:"The lion king", es:"සිංහ රජා"},
+    {e:"Queen", s:"රැජින", p:"kwiːn", ex:"Beautiful queen", es:"ලස්සන රැජිනක්"},
+    {e:"Adult", s:"වැඩිහිටියා", p:"ˈædʌlt", ex:"For adults", es:"වැඩිහිටියන් සඳහා"},
+    {e:"Baby", s:"බබා", p:"ˈbeɪbi", ex:"Cute baby", es:"හුරතල් බබෙක්"},
+    {e:"Guest", s:"අමුත්තා", p:"gɛst", ex:"Welcome guest", es:"අමුත්තා පිළිගන්න"},
+    {e:"Neighbor", s:"අසල්වැසියා", p:"ˈneɪbə", ex:"Good neighbor", es:"හොඳ අසල්වැසියෙක්"},
+    {e:"Enemy", s:"සතුරා", p:"ˈɛnɪmi", ex:"No enemy", es:"සතුරෙක් නෑ"},
+    {e:"Leader", s:"නායකයා", p:"ˈliːdə", ex:"Team leader", es:"කණ්ඩායම් නායකයා"},
+    {e:"Group", s:"කණ්ඩායම/පිරිස", p:"gruːp", ex:"Small group", es:"පොඩි පිරිසක්"},
+    {e:"Crowd", s:"සෙනග", p:"kraʊd", ex:"Big crowd", es:"ලොකු සෙනගක්"},
+
+    // DAY 48: පොළව සහ පරිසරය (Earth & Nature)
+    {e:"Earth", s:"පෘථිවිය/පොළව", p:"ɜːθ", ex:"Save earth", es:"පෘථිවිය බේරගන්න"},
+    {e:"Land", s:"ඉඩම/ගොඩබිම", p:"lænd", ex:"Buy land", es:"ඉඩමක් ගන්න"},
+    {e:"Sea", s:"මුහුද", p:"siː", ex:"Blue sea", es:"නිල් මුහුද"},
+    {e:"Sky", s:"අහස", p:"skaɪ", ex:"Look at sky", es:"අහස බලන්න"},
+    {e:"Star", s:"තරුව", p:"stɑː", ex:"Shining star", es:"දිලිසෙන තරුවක්"},
+    {e:"Planet", s:"ග්‍රහලෝකය", p:"ˈplænɪt", ex:"Mars planet", es:"අඟහරු ග්‍රහලෝකය"},
+    {e:"Grass", s:"තණකොළ", p:"grɑːs", ex:"Green grass", es:"කොළ පාට තණකොළ"},
+    {e:"Plant", s:"පැලය", p:"plɑːnt", ex:"Water the plant", es:"පැලේට වතුර දාන්න"},
+    {e:"Leaf", s:"කොළය", p:"liːf", ex:"Green leaf", es:"කොළ පාට කොළයක්"},
+    {e:"Root", s:"මුල (ගසක)", p:"ruːt", ex:"Tree root", es:"ගසේ මුල"},
+
+    // DAY 49: මානසික ක්‍රියා (Mental Verbs)
+    {e:"Think", s:"හිතනවා", p:"θɪŋk", ex:"Think big", es:"ලොකුවට හිතන්න"},
+    {e:"Know", s:"දන්නවා", p:"nəʊ", ex:"I know you", es:"මම ඔයාව දන්නවා"},
+    {e:"Guess", s:"අනුමාන කරනවා", p:"gɛs", ex:"Guess what", es:"මොකක්ද කියලා අනුමාන කරන්න"},
+    {e:"Wish", s:"ප්‍රාර්ථනා කරනවා", p:"wɪʃ", ex:"Make a wish", es:"ප්‍රාර්ථනාවක් කරන්න"},
+    {e:"Decide", s:"තීරණය කරනවා", p:"dɪˈsaɪd", ex:"Decide now", es:"දැන් තීරණය කරන්න"},
+    {e:"Choose", s:"තෝරනවා", p:"ʧuːz", ex:"Choose one", es:"එකක් තෝරගන්න"},
+    {e:"Plan", s:"සැලසුම් කරනවා", p:"plæn", ex:"Good plan", es:"හොඳ සැලැස්මක්"},
+    {e:"Fail", s:"අසමත් වෙනවා", p:"feɪl", ex:"Do not fail", es:"අසමත් වෙන්න එපා"},
+    {e:"Succeed", s:"සාර්ථක වෙනවා", p:"səkˈsiːd", ex:"Work to succeed", es:"සාර්ථක වෙන්න වැඩ කරන්න"},
+    {e:"Try", s:"උත්සාහ කරනවා", p:"traɪ", ex:"Try again", es:"නැවත උත්සාහ කරන්න"},
+
+    // DAY 50: නිර්මාණය සහ විනාශය (Create & Destroy)
+    {e:"Make", s:"හදනවා", p:"meɪk", ex:"Make tea", es:"තේ හදන්න"},
+    {e:"Build", s:"ගොඩනගනවා", p:"bɪld", ex:"Build a house", es:"ගෙයක් හදන්න"},
+    {e:"Break", s:"කඩනවා", p:"breɪk", ex:"Do not break", es:"කඩන්න එපා"},
+    {e:"Fix", s:"හදනවා (අලුත්වැඩියා)", p:"fɪks", ex:"Fix the car", es:"කාර් එක හදන්න"},
+    {e:"Cut", s:"කපනවා", p:"kʌt", ex:"Cut the cake", es:"කේක් එක කපන්න"},
+    {e:"Draw", s:"අඳිනවා", p:"drɔː", ex:"Draw a cat", es:"පූසෙක් අඳින්න"},
+    {e:"Paint", s:"පාට කරනවා", p:"peɪnt", ex:"Paint the wall", es:"බිත්තිය පාට කරන්න"},
+    {e:"Grow", s:"වවනවා/වැවෙනවා", p:"grəʊ", ex:"Plants grow", es:"පැල වැවෙනවා"},
+    {e:"Keep", s:"තියාගන්නවා", p:"kiːp", ex:"Keep it safe", es:"ඒක පරිස්සමින් තියාගන්න"},
+    {e:"Show", s:"පෙන්වනවා", p:"ʃəʊ", ex:"Show me", es:"මට පෙන්වන්න"}
+);
+
+/* --- PART 7: WORDS 501 - 600 (Days 51-60) --- */
+fullData.push(
+    // DAY 51: ස්ථාන පිහිටීම් (Positions)
+    {e:"Above", s:"ඉහළින්", p:"əˈbʌv", ex:"Look above", es:"ඉහළින් බලන්න"},
+    {e:"Below", s:"පහළින්", p:"bɪˈləʊ", ex:"See below", es:"පහළින් බලන්න"},
+    {e:"Behind", s:"පිටුපස", p:"bɪˈhaɪnd", ex:"Behind the tree", es:"ගස පිටුපස"},
+    {e:"Between", s:"මැද/අතර", p:"bɪˈtwiːn", ex:"Between two cars", es:"කාර් දෙකක් අතර"},
+    {e:"Inside", s:"ඇතුලේ", p:"ɪnˈsaɪd", ex:"Go inside", es:"ඇතුලට යන්න"},
+    {e:"Outside", s:"එළියේ", p:"ˌaʊtˈsaɪd", ex:"Play outside", es:"එළියේ සෙල්ලම් කරන්න"},
+    {e:"Next to", s:"යාබදව/ළඟ", p:"nɛkst tuː", ex:"Sit next to me", es:"මගේ ළඟින් වාඩිවෙන්න"},
+    {e:"Opposite", s:"ඉදිරිපිට/විරුද්ධ", p:"ˈɒpəzɪt", ex:"Opposite side", es:"විරුද්ධ පැත්ත"},
+    {e:"Through", s:"තුළින්/හරහා", p:"θruː", ex:"Go through", es:"හරහා යන්න"},
+    {e:"Around", s:"වටේට", p:"əˈraʊnd", ex:"Turn around", es:"වටේට කැරකෙන්න (හැරෙන්න)"},
+
+    // DAY 52: පුද්ගල ස්වභාවයන් (Personality)
+    {e:"Brave", s:"නිර්භීත", p:"breɪv", ex:"Brave soldier", es:"නිර්භීත සොල්දාදුවෙක්"},
+    {e:"Shy", s:"ලැජ්ජාශීලී", p:"ʃaɪ", ex:"Do not be shy", es:"ලැජ්ජා වෙන්න එපා"},
+    {e:"Lazy", s:"කම්මැලි", p:"ˈleɪzi", ex:"Lazy cat", es:"කම්මැලි පූසෙක්"},
+    {e:"Smart", s:"දක්ෂ/බුද්ධිමත්", p:"smɑːt", ex:"Smart boy", es:"දක්ෂ පිරිමි ළමයෙක්"},
+    {e:"Stupid", s:"මෝඩ", p:"ˈstjuːpɪd", ex:"Stupid mistake", es:"මෝඩ වැරැද්දක්"},
+    {e:"Polite", s:"විනීත", p:"pəˈlaɪt", ex:"Be polite", es:"විනීත වන්න"},
+    {e:"Rude", s:"රළු/අවිනීත", p:"ruːd", ex:"Do not be rude", es:"අවිනීත වෙන්න එපා"},
+    {e:"Honest", s:"අවංක", p:"ˈɒnɪst", ex:"Honest man", es:"අවංක මිනිසෙක්"},
+    {e:"Quiet", s:"නිහඬ", p:"ˈkwaɪət", ex:"Be quiet", es:"නිහඬ වෙන්න"},
+    {e:"Loud", s:"ඝෝෂාකාරී", p:"laʊd", ex:"Loud noise", es:"ඝෝෂාකාරී ශබ්දයක්"},
+
+    // DAY 53: විරුද්ධ පද සහ තත්වයන් (Conditions)
+    {e:"Safe", s:"ආරක්ෂිත", p:"seɪf", ex:"Safe place", es:"ආරක්ෂිත ස්ථානයක්"},
+    {e:"Dangerous", s:"භයානක", p:"ˈdeɪnʤrəs", ex:"Dangerous animal", es:"භයානක සතෙක්"},
+    {e:"Wet", s:"තෙත", p:"wɛt", ex:"Wet clothes", es:"තෙත ඇඳුම්"},
+    {e:"Dry", s:"වියළි", p:"draɪ", ex:"Dry land", es:"වියළි පොළව"},
+    {e:"Simple", s:"සරල", p:"ˈsɪmpl", ex:"Simple answer", es:"සරල පිළිතුරක්"},
+    {e:"Complex", s:"සංකීර්ණ", p:"ˈkɒmplɛks", ex:"Complex problem", es:"සංකීර්ණ ගැටළුවක්"},
+    {e:"Real", s:"ඇත්ත/සැබෑ", p:"rɪəl", ex:"Real love", es:"සැබෑ ආදරය"},
+    {e:"Fake", s:"බොරු/ව්‍යාජ", p:"feɪk", ex:"Fake news", es:"ව්‍යාජ පුවත් (බොරු නිව්ස්)"},
+    {e:"Correct", s:"හරි/නිවැරදි", p:"kəˈrɛkt", ex:"Correct answer", es:"නිවැරදි පිළිතුර"},
+    {e:"Wrong", s:"වැරදි", p:"rɒŋ", ex:"Wrong way", es:"වැරදි පාරක්"},
+
+    // DAY 54: ඉන්ද්‍රියන් සහ දැනීම් (Senses)
+    {e:"See", s:"දකිනවා", p:"siː", ex:"I see you", es:"මම ඔයාව දකිනවා"},
+    {e:"Look", s:"බලනවා", p:"lʊk", ex:"Look at that", es:"අර බලන්න"},
+    {e:"Hear", s:"ඇහෙනවා", p:"hɪə", ex:"I hear sound", es:"මට සද්දයක් ඇහෙනවා"},
+    {e:"Listen", s:"අහනවා (උවමනාවෙන්)", p:"ˈlɪsn", ex:"Listen music", es:"සින්දු අහන්න"},
+    {e:"Smell", s:"සුවඳ/ගඳ දැනෙනවා", p:"smɛl", ex:"Smell the flower", es:"මල ඉඹලා බලන්න (සුවඳ බලන්න)"},
+    {e:"Taste", s:"රස බලනවා/දැනෙනවා", p:"teɪst", ex:"Taste this", es:"මේක කාලා බලන්න (රස බලන්න)"},
+    {e:"Touch", s:"අල්ලනවා", p:"tʌʧ", ex:"Do not touch", es:"අල්ලන්න එපා"},
+    {e:"Feel", s:"දැනෙනවා", p:"fiːl", ex:"I feel good", es:"මට හොඳක් දැනෙනවා"},
+    {e:"Sound", s:"ශබ්දය", p:"saʊnd", ex:"Loud sound", es:"හයිය ශබ්දයක්"},
+    {e:"Noise", s:"ඝෝෂාව", p:"nɔɪz", ex:"Stop the noise", es:"ඝෝෂාව නවත්වන්න"},
+
+    // DAY 55: ශරීරයේ කොටස් - 2 (Body Parts II)
+    {e:"Heart", s:"හෘදය", p:"hɑːt", ex:"My heart beats", es:"මගේ හදවත ගැහෙනවා"},
+    {e:"Brain", s:"මොළය", p:"breɪn", ex:"Use your brain", es:"ඔයාගේ මොළය පාවිච්චි කරන්න"},
+    {e:"Stomach", s:"බඩ/ආමාශය", p:"ˈstʌmək", ex:"Full stomach", es:"බඩ පිරිලා"},
+    {e:"Skin", s:"සම", p:"skɪn", ex:"Soft skin", es:"මෘදු සමක්"},
+    {e:"Bone", s:"ඇටය", p:"bəʊn", ex:"Dog eats bone", es:"බල්ලා ඇටයක් කනවා"},
+    {e:"Neck", s:"බෙල්ල", p:"nɛk", ex:"Long neck", es:"දිග බෙල්ලක්"},
+    {e:"Shoulder", s:"උරහිස", p:"ˈʃəʊldə", ex:"Shoulder bag", es:"උරහිසේ දාන බෑග් එකක්"},
+    {e:"Finger", s:"ඇඟිල්ල", p:"ˈfɪŋgə", ex:"Five fingers", es:"ඇඟිලි පහක්"},
+    {e:"Knee", s:"දණහිස", p:"niː", ex:"Hurt my knee", es:"මගේ දණහිස තුවාල වුනා"},
+    {e:"Foot", s:"පාදය", p:"fʊt", ex:"Right foot", es:"දකුණු කකුල (පාදය)"},
+
+    // DAY 56: පැළඳුම් සහ ආභරණ (Accessories)
+    {e:"Watch", s:"අත් ඔරලෝසුව", p:"wɒʧ", ex:"Nice watch", es:"ලස්සන ඔරලෝසුවක්"},
+    {e:"Glasses", s:"කණ්ණාඩිය (ඇස්)", p:"ˈglɑːsɪz", ex:"Reading glasses", es:"කියවන්න දාන කණ්ණාඩිය"},
+    {e:"Belt", s:"පටි", p:"bɛlt", ex:"Leather belt", es:"සම් පටියක්"},
+    {e:"Wallet", s:"පိုက် දාන පර්ස් එක", p:"ˈwɒlɪt", ex:"Lost wallet", es:"නැතිවුණු පර්ස් එකක්"},
+    {e:"Purse", s:"කාන්තා පසුම්බිය", p:"pɜːs", ex:"Red purse", es:"රතු පාට පසුම්බියක්"},
+    {e:"Umbrella", s:"කුඩය", p:"ʌmˈbrɛlə", ex:"Take umbrella", es:"කුඩය අරන් යන්න"},
+    {e:"Chain", s:"මාලයක්/දාමයක්", p:"ʧeɪn", ex:"Silver chain", es:"රිදී මාලයක්"},
+    {e:"Socks", s:"මේස්", p:"sɒks", ex:"Wear socks", es:"මේස් දාගන්න"},
+    {e:"Gloves", s:"අත් වැසුම්", p:"glʌvz", ex:"Cold gloves", es:"සීතලට දාන අත් වැසුම්"},
+    {e:"Scarf", s:"ස්කාෆ් එක", p:"skɑːf", ex:"Neck scarf", es:"බෙල්ලට දාන ස්කාෆ් එක"},
+
+    // DAY 57: පළතුරු සහ එළවළු (Fruits & Veg)
+    {e:"Apple", s:"ඇපල්", p:"ˈæpl", ex:"Red apple", es:"රතු ඇපල් ගෙඩියක්"},
+    {e:"Banana", s:"කෙසෙල්", p:"bəˈnɑːnə", ex:"Yellow banana", es:"කහ පාට කෙසෙල් ගෙඩියක්"},
+    {e:"Orange", s:"දොඩම්", p:"ˈɒrɪnʤ", ex:"Sweet orange", es:"පැණිරස දොඩම්"},
+    {e:"Mango", s:"අඹ", p:"ˈmæŋgəʊ", ex:"Tasty mango", es:"රස අඹ"},
+    {e:"Potato", s:"අල", p:"pəˈteɪtəʊ", ex:"Fried potato", es:"බැදපු අල"},
+    {e:"Tomato", s:"තක්කාලි", p:"təˈmɑːtəʊ", ex:"Red tomato", es:"රතු තක්කාලි"},
+    {e:"Onion", s:"ළූණු", p:"ˈʌnjən", ex:"Cut onion", es:"ළූණු කපන්න"},
+    {e:"Carrot", s:"කැරට්", p:"ˈkærət", ex:"Eat carrot", es:"කැරට් කන්න"},
+    {e:"Coconut", s:"පොල්", p:"ˈkəʊkənʌt", ex:"Coconut tree", es:"පොල් ගහ"},
+    {e:"Lemon", s:"දෙහි", p:"ˈlɛmən", ex:"Sour lemon", es:"ඇඹුල් දෙහි"},
+
+    // DAY 58: සත්තු - 3 (Wild Animals)
+    {e:"Elephant", s:"අලියා", p:"ˈɛlɪfənt", ex:"Big elephant", es:"ලොකු අලියෙක්"},
+    {e:"Rabbit", s:"හාවා", p:"ˈræbɪt", ex:"Fast rabbit", es:"වේගවත් හාවෙක්"},
+    {e:"Deer", s:"මුවා", p:"dɪə", ex:"Run deer", es:"මුවා දුවනවා"},
+    {e:"Duck", s:"තාරාවා", p:"dʌk", ex:"Duck swims", es:"තාරාවා පීනනවා"},
+    {e:"Spider", s:"මකුළුවා", p:"ˈspaɪdə", ex:"Scary spider", es:"බය හිතෙන මකුළුවෙක්"},
+    {e:"Ant", s:"කූඹියා", p:"ænt", ex:"Small ant", es:"පොඩි කූඹියෙක්"},
+    {e:"Bee", s:"මැස්සා", p:"biː", ex:"Bee honey", es:"මී පැණි"},
+    {e:"Butterfly", s:"සමනලයා", p:"ˈbʌtəflaɪ", ex:"Beautiful butterfly", es:"ලස්සන සමනලයෙක්"},
+    {e:"Fox", s:"නරියා", p:"fɒks", ex:"Clever fox", es:"කපටි නරියෙක්"},
+    {e:"Frog", s:"ගෙම්බා", p:"frɒg", ex:"Green frog", es:"කොළ පාට ගෙම්බෙක්"},
+
+    // DAY 59: හුවමාරු ක්‍රියා (Transfer Verbs)
+    {e:"Give", s:"දෙනවා", p:"gɪv", ex:"Give me that", es:"මට ඒක දෙන්න"},
+    {e:"Get", s:"ලැබෙනවා/ගන්නවා", p:"gɛt", ex:"I get it", es:"මට ඒක ලැබෙනවා (තේරෙනවා)"},
+    {e:"Take", s:"ගන්නවා/රැගෙන යනවා", p:"teɪk", ex:"Take this", es:"මේක ගන්න"},
+    {e:"Bring", s:"ගෙනෙනවා", p:"brɪŋ", ex:"Bring water", es:"වතුර ගේන්න"},
+    {e:"Send", s:"යවනවා", p:"sɛnd", ex:"Send money", es:"සල්ලි යවන්න"},
+    {e:"Receive", s:"ලැබෙනවා", p:"rɪˈsiːv", ex:"Receive letter", es:"ලියුම ලැබෙනවා"},
+    {e:"Keep", s:"තියාගන්නවා", p:"kiːp", ex:"Keep silent", es:"නිශ්ශබ්දව ඉන්න (කට වහන් ඉන්න)"},
+    {e:"Show", s:"පෙන්වනවා", p:"ʃəʊ", ex:"Show me", es:"මට පෙන්වන්න"},
+    {e:"Hide", s:"හංගනවා", p:"haɪd", ex:"Hide the toy", es:"සෙල්ලම් බඩුව හංගන්න"},
+    {e:"Find", s:"හොයාගන්නවා", p:"faɪnd", ex:"Find the key", es:"යතුර හොයාගන්න"},
+
+    // DAY 60: ගෙදර දොරේ වැඩ (Household Verbs)
+    {e:"Sweep", s:"අතුගානවා", p:"swiːp", ex:"Sweep floor", es:"බිම අතුගාන්න"},
+    {e:"Mop", s:"මොප් කරනවා", p:"mɒp", ex:"Mop the room", es:"කාමරය මොප් කරන්න (තෙත රෙද්දෙන් පිහදාන්න)"},
+    {e:"Wash", s:"හෝදනවා/සෝදනවා", p:"wɒʃ", ex:"Wash clothes", es:"ඇඳුම් හෝදන්න"},
+    {e:"Clean", s:"පිරිසිදු කරනවා", p:"kliːn", ex:"Clean house", es:"ගෙදර පිරිසිදු කරන්න"},
+    {e:"Boil", s:"තම්බනවා", p:"bɔɪl", ex:"Boil water", es:"වතුර උණු කරන්න (තම්බන්න)"},
+    {e:"Fry", s:"බදිනවා", p:"fraɪ", ex:"Fry egg", es:"බිත්තරයක් බදින්න"},
+    {e:"Iron", s:"මැදීම (රෙදි)", p:"ˈaɪən", ex:"Iron shirt", es:"කමිසය අයන් කරන්න"},
+    {e:"Dry", s:"වේලනවා", p:"draɪ", ex:"Dry clothes", es:"ඇඳුම් වේලන්න"},
+    {e:"Dust", s:"දූවිලි පිහදානවා", p:"dʌst", ex:"Dust table", es:"මේසයේ දූවිලි පිහදාන්න"},
+    {e:"Mix", s:"කලවම් කරනවා", p:"mɪks", ex:"Mix sugar", es:"සීනි කලවම් කරන්න"}
+);
+
+/* --- PART 8: WORDS 601 - 700 (Days 61-70) --- */
+fullData.push(
+    // DAY 61: ද්‍රව්‍ය සහ දේවල් (Substances)
+    {e:"Air", s:"වාතය/හුළඟ", p:"eə", ex:"Fresh air", es:"නැවුම් වාතය"},
+    {e:"Gas", s:"වායු/ගෑස්", p:"gæs", ex:"Cooking gas", es:"උයන ගෑස්"},
+    {e:"Oil", s:"තෙල්", p:"ɔɪl", ex:"Coconut oil", es:"පොල් තෙල්"},
+    {e:"Smoke", s:"දුම", p:"sməʊk", ex:"Black smoke", es:"කළු පාට දුම"},
+    {e:"Dust", s:"දූවිලි", p:"dʌst", ex:"Clean the dust", es:"දූවිලි පිහදාන්න"},
+    {e:"Dirt", s:"කුණු/පස්", p:"dɜːt", ex:"Dirt on clothes", es:"ඇඳුම් වල කුණු"},
+    {e:"Mud", s:"මඩ", p:"mʌd", ex:"Walk in mud", es:"මඩේ ඇවිදින්න"},
+    {e:"Glue", s:"ගම්/මැලියම්", p:"gluː", ex:"Stick with glue", es:"ගම් ගාලා අලවන්න"},
+    {e:"Ink", s:"තීන්ත (පෑනක)", p:"ɪŋk", ex:"Blue ink", es:"නිල් පාට තීන්ත"},
+    {e:"Powder", s:"පවුඩර්/කුඩු", p:"ˈpaʊdə", ex:"Face powder", es:"මූණේ ගාන පවුඩර්"},
+
+    // DAY 62: ක්‍රියා විශේෂණ (Adverbs of Manner)
+    {e:"Quickly", s:"ඉක්මනට", p:"ˈkwɪkli", ex:"Run quickly", es:"ඉක්මනට දුවන්න"},
+    {e:"Slowly", s:"හිමින්", p:"ˈsləʊli", ex:"Walk slowly", es:"හිමින් ඇවිදින්න"},
+    {e:"Loudly", s:"හයියෙන් (ශබ්ද නගා)", p:"ˈlaʊdli", ex:"Speak loudly", es:"හයියෙන් කතා කරන්න"},
+    {e:"Quietly", s:"නිහඬව/හිමින්", p:"ˈkwaɪətli", ex:"Sit quietly", es:"නිහඬව වාඩිවෙන්න"},
+    {e:"Well", s:"හොඳට", p:"wɛl", ex:"Done well", es:"හොඳට කළා (නියමයි)"},
+    {e:"Badly", s:"නරකට", p:"ˈbædli", ex:"Behaved badly", es:"නරකට හැසිරුනා"},
+    {e:"Hard", s:"අමාරුවෙන්/තදින්", p:"hɑːd", ex:"Work hard", es:"මහන්සි වී වැඩ කරන්න"},
+    {e:"Easily", s:"ලේසියෙන්", p:"ˈiːzɪli", ex:"Won easily", es:"ලේසියෙන් දිනුවා"},
+    {e:"Together", s:"එකට", p:"təˈgɛðə", ex:"Work together", es:"එකට වැඩ කරන්න"},
+    {e:"Alone", s:"තනිවම", p:"əˈləʊn", ex:"Go alone", es:"තනියම යන්න"},
+
+    // DAY 63: සංචාරය සහ ගමන් (Travel & Trips)
+    {e:"Trip", s:"ගමනක් (විනෝද)", p:"trɪp", ex:"School trip", es:"පාසල් විනෝද ගමනක්"},
+    {e:"Tour", s:"සංචාරය", p:"tʊə", ex:"World tour", es:"ලෝක සංචාරයක්"},
+    {e:"Journey", s:"දීර්ඝ ගමන", p:"ˈʤɜːni", ex:"Long journey", es:"දීර්ඝ ගමනක්"},
+    {e:"Passport", s:"විදෙස් ගමන් බලපත්‍රය", p:"ˈpɑːspɔːt", ex:"Check passport", es:"පාස්පෝට් එක බලන්න"},
+    {e:"Visa", s:"වීසා", p:"ˈviːzə", ex:"Get a visa", es:"වීසා එකක් ගන්න"},
+    {e:"Luggage", s:"ගමන් මලු", p:"ˈlʌgɪʤ", ex:"Heavy luggage", es:"බර ගමන් මලු"},
+    {e:"Suitcase", s:"සූට්කේස් එක", p:"ˈsuːtkeɪs", ex:"Pack suitcase", es:"සූට්කේස් එක ලෑස්ති කරන්න"},
+    {e:"Passenger", s:"මගියා", p:"ˈpæsɪnʤə", ex:"Bus passenger", es:"බස් මගියා"},
+    {e:"Flight", s:"ගුවන් ගමන", p:"flaɪt", ex:"Book a flight", es:"ප්ලේන් එකක් බුක් කරන්න"},
+    {e:"Arrival", s:"පැමිණීම", p:"əˈraɪvəl", ex:"Arrival time", es:"පැමිණෙන වෙලාව"},
+
+    // DAY 64: පරිගණක සහ තාක්ෂණය - 2 (Tech II)
+    {e:"Screen", s:"තිරය", p:"skriːn", ex:"Touch screen", es:"ටච් ස්ක්‍රීන් එක (ස්පර්ශ තිරය)"},
+    {e:"Keyboard", s:" යතුරු පුවරුව", p:"ˈkiːbɔːd", ex:"Type on keyboard", es:"කීබෝඩ් එකේ ටයිප් කරන්න"},
+    {e:"Mouse", s:"මවුස් එක", p:"maʊs", ex:"Click mouse", es:"මවුස් එක ක්ලික් කරන්න"},
+    {e:"Battery", s:"බැටරිය", p:"ˈbætəri", ex:"Low battery", es:"බැටරි බැහැලා"},
+    {e:"Charger", s:"චාජරය", p:"ˈʧɑːʤə", ex:"Phone charger", es:"පෝන් චාජරය"},
+    {e:"File", s:"ගොනුව (File)", p:"faɪl", ex:"Open file", es:"ෆයිල් එක ඕපන් කරන්න"},
+    {e:"Folder", s:"ෆෝල්ඩරය", p:"ˈfəʊldə", ex:"New folder", es:"අලුත් ෆෝල්ඩර් එකක්"},
+    {e:"Email", s:"විද්‍යුත් තැපෑල", p:"ˈiːmeɪl", ex:"Send email", es:"ඊමේල් එකක් යවන්න"},
+    {e:"Password", s:"මුරපදය", p:"ˈpɑːswɜːd", ex:"Enter password", es:"පාස්වර්ඩ් එක ගහන්න"},
+    {e:"Link", s:"ලින්ක් එක", p:"lɪŋk", ex:"Click the link", es:"ලින්ක් එක ක්ලික් කරන්න"},
+
+    // DAY 65: රැකියා - 2 (Professions II)
+    {e:"Singer", s:"ගායකයා", p:"ˈsɪŋə", ex:"Good singer", es:"හොඳ ගායකයෙක්"},
+    {e:"Actor", s:"නළුවා", p:"ˈæktə", ex:"Famous actor", es:"ජනප්‍රිය නළුවෙක්"},
+    {e:"Artist", s:"චිත්‍ර ශිල්පියා", p:"ˈɑːtɪst", ex:"Talented artist", es:"දක්ෂ ශිල්පියෙක්"},
+    {e:"Writer", s:"ලේඛකයා", p:"ˈraɪtə", ex:"Book writer", es:"පොත් ලියන කෙනෙක්"},
+    {e:"Soldier", s:"සෙබළා", p:"ˈsəʊlʤə", ex:"Brave soldier", es:"නිර්භීත සෙබළෙක්"},
+    {e:"Pilot", s:"ගුවන් නියමුවා", p:"ˈpaɪlət", ex:"Plane pilot", es:"ගුවන් යානයේ නියමුවා"},
+    {e:"Captain", s:"නායකයා/කැප්ටන්", p:"ˈkæptɪn", ex:"Team captain", es:"කණ්ඩායමේ නායකයා"},
+    {e:"Judge", s:"විනිසුරු", p:"ʤʌʤ", ex:"Court judge", es:"උසාවියේ විනිසුරු"},
+    {e:"Lawyer", s:"නීතිඥයා", p:"ˈlɔːjə", ex:"Talk to lawyer", es:"නීතිඥයාට කතා කරන්න"},
+    {e:"Guard", s:"ආරක්ෂකයා", p:"gɑːd", ex:"Security guard", es:"ආරක්ෂක නිලධාරියා"},
+
+    // DAY 66: මිනුම් සහ ගණිතය (Measurements)
+    {e:"Size", s:"ප්‍රමාණය", p:"saɪz", ex:"Big size", es:"ලොකු සයිස් එකක්"},
+    {e:"Length", s:"දිග", p:"lɛŋθ", ex:"Measure length", es:"දිග මනින්න"},
+    {e:"Width", s:"පළල", p:"wɪdθ", ex:"Check width", es:"පළල බලන්න"},
+    {e:"Height", s:"උස", p:"haɪt", ex:"Your height", es:"ඔයාගේ උස"},
+    {e:"Weight", s:"බර", p:"weɪt", ex:"Lose weight", es:"බර අඩු කරගන්න"},
+    {e:"Speed", s:"වේගය", p:"spiːd", ex:"High speed", es:"අධික වේගය"},
+    {e:"Distance", s:"දුර (පරතරය)", p:"ˈdɪstəns", ex:"Long distance", es:"ලොකු දුරක්"},
+    {e:"Total", s:"එකතුව/මුළු", p:"ˈtəʊtl", ex:"Total price", es:"මුළු මුදල (ගාණ)"},
+    {e:"Center", s:"මැද", p:"ˈsɛntə", ex:"Center point", es:"මැද ලක්ෂ්‍යය"},
+    {e:"Corner", s:"මුල්ල", p:"ˈkɔːnə", ex:"Street corner", es:"පාරේ මුල්ල"},
+
+    // DAY 67: ඇඳුම් - 2 (Clothing II)
+    {e:"Jacket", s:"ජැකට් එක", p:"ˈʤækɪt", ex:"Warm jacket", es:"උණුසුම් ජැකට් එකක්"},
+    {e:"Coat", s:"කෝට් එක", p:"kəʊt", ex:"Black coat", es:"කළු කෝට් එකක්"},
+    {e:"Suit", s:"සූට් එක (කලිසම් කබා)", p:"sjuːt", ex:"Wear a suit", es:"සූට් එකක් අඳින්න"},
+    {e:"Tie", s:" ටයි පටිය", p:"taɪ", ex:"Red tie", es:"රතු ටයි පටියක්"},
+    {e:"Skirt", s:"සාය", p:"skɜːt", ex:"Long skirt", es:"දිග සායක්"},
+    {e:"Shorts", s:"කොට කලිසම", p:"ʃɔːts", ex:"Gym shorts", es:"ජිම් යන කොට කලිසම"},
+    {e:"Scarf", s:"ස්කාෆ් එක", p:"skɑːf", ex:"Neck scarf", es:"බෙල්ලට දාන ස්කාෆ් එක"},
+    {e:"Uniform", s:"නිල ඇඳුම", p:"ˈjuːnɪfɔːm", ex:"School uniform", es:"පාසල් නිල ඇඳුම"},
+    {e:"Button", s:"බොත්තම", p:"ˈbʌtn", ex:"Press button", es:"බොත්තම ඔබන්න"},
+    {e:"Zipper", s:"සිප් එක", p:"ˈzɪpə", ex:"Close zipper", es:"සිප් එක වහන්න"},
+
+    // DAY 68: ඉවුම් පිහුම් ක්‍රියා (Cooking Actions)
+    {e:"Stir", s:"හැඳි ගානවා", p:"stɜː", ex:"Stir the tea", es:"තේ එක හැඳි ගාන්න"},
+    {e:"Bake", s:"පුච්චනවා (උඳුනක)", p:"beɪk", ex:"Bake cake", es:"කේක් එකක් හදන්න (බේක් කරන්න)"},
+    {e:"Roast", s:"පුච්චනවා (ගින්දරෙන්)", p:"rəʊst", ex:"Roast chicken", es:"රෝස්ට් කරපු කුකුල් මස්"},
+    {e:"Grill", s:"ග්‍රිල් කරනවා", p:"grɪl", ex:"Grill fish", es:"මාළු ග්‍රිල් කරන්න"},
+    {e:"Chop", s:"කපනවා (කෑලි)", p:"ʧɒp", ex:"Chop onions", es:"ළූණු කපන්න"},
+    {e:"Slice", s:"පෙති කපනවා", p:"slaɪs", ex:"Slice bread", es:"පාන් පෙති කපන්න"},
+    {e:"Peel", s:"පොතු අරිනවා", p:"piːl", ex:"Peel banana", es:"කෙසෙල් ගෙඩියේ පොත්ත අරින්න"},
+    {e:"Pour", s:"වක්කරනවා", p:"pɔː", ex:"Pour water", es:"වතුර වක්කරන්න"},
+    {e:"Serve", s:"බෙදනවා (කෑම)", p:"sɜːv", ex:"Serve food", es:"කෑම බෙදන්න"},
+    {e:"Boil", s:"තම්බනවා", p:"bɔɪl", ex:"Boil egg", es:"බිත්තර තම්බන්න"},
+
+    // DAY 69: කෑම වර්ග (Fast Food & Snacks)
+    {e:"Pizza", s:"පීසා", p:"ˈpiːtsə", ex:"Hot pizza", es:"රස්නේ පීසා"},
+    {e:"Burger", s:"බර්ගර්", p:"ˈbɜːgə", ex:"Cheese burger", es:"චීස් බර්ගර් එකක්"},
+    {e:"Sandwich", s:" සැන්ඩ්විච්", p:"ˈsænwɪʤ", ex:"Chicken sandwich", es:"චිකන් සැන්ඩ්විච් එකක්"},
+    {e:"Soup", s:"සුප්", p:"suːp", ex:"Hot soup", es:"රස්නේ සුප්"},
+    {e:"Salad", s:"සැලඩ්", p:"ˈsæləd", ex:"Green salad", es:"එළවළු සැලඩ් එකක්"},
+    {e:"Noodle", s:"නූඩ්ල්ස්", p:"ˈnuːdl", ex:"Eat noodles", es:"නූඩ්ල්ස් කන්න"},
+    {e:"Pasta", s:"පැස්ටා", p:"ˈpæstə", ex:"Tasty pasta", es:"රස පැස්ටා"},
+    {e:"Cake", s:"කේක්", p:"keɪk", ex:"Birthday cake", es:"උපන් දින කේක් එකක්"},
+    {e:"Cookie", s:"බිස්කට්/කුකී", p:"ˈkʊki", ex:"Sweet cookie", es:"පැණිරස බිස්කට් එකක්"},
+    {e:"Candy", s:"ටොපි/පැණිරස", p:"ˈkændi", ex:"Eat candy", es:"ටොපි කන්න"},
+
+    // DAY 70: සමාජීය ක්‍රියා (Social Verbs)
+    {e:"Visit", s:"බලන්න යනවා", p:"ˈvɪzɪt", ex:"Visit friends", es:"යාළුවෝ බලන්න යන්න"},
+    {e:"Invite", s:"ආරාධනා කරනවා", p:"ɪnˈvaɪt", ex:"Invite me", es:"මට ආරාධනා කරන්න"},
+    {e:"Join", s:"එකතු වෙනවා/සම්බන්ධ වෙනවා", p:"ʤɔɪn", ex:"Join us", es:"අපිට එකතු වෙන්න (සෙට් වෙන්න)"},
+    {e:"Share", s:"බෙදා ගන්නවා", p:"ʃeə", ex:"Share food", es:"කෑම බෙදාගන්න"},
+    {e:"Gift", s:"තෑග්ග", p:"gɪft", ex:"Nice gift", es:"ලස්සන තෑග්ගක්"},
+    {e:"Party", s:"සාදය", p:"ˈpɑːti", ex:"Big party", es:"ලොකු පාටියක්"},
+    {e:"Celebrate", s:"සමරනවා", p:"ˈsɛlɪbreɪt", ex:"Celebrate life", es:"ජීවිතය සමරන්න"},
+    {e:"Welcome", s:"පිළිගන්නවා", p:"ˈwɛlkəm", ex:"Welcome home", es:"සාදරයෙන් පිළිගන්නවා"},
+    {e:"Hug", s:"වැළඳගන්නවා", p:"hʌg", ex:"Big hug", es:"හයියෙන් බදාගන්න"},
+    {e:"Kiss", s:"හාදුව", p:"kɪs", ex:"Kiss baby", es:"බබාට කිස් එකක් දෙන්න"}
+);
+
+/* --- PART 9: WORDS 701 - 800 (Days 71-80) --- */
+fullData.push(
+    // DAY 71: වාහන සහ ප්‍රවාහන - 2 (Transport II)
+    {e:"Truck", s:"ට්‍රක් එක/ලොරි", p:"trʌk", ex:"Big truck", es:"ලොකු ට්‍රක් රථයක්"},
+    {e:"Van", s:"වෑන් එක", p:"væn", ex:"School van", es:"පාසල් වෑන් රථය"},
+    {e:"Ship", s:"නැව", p:"ʃɪp", ex:"Big ship", es:"ලොකු නැවක්"},
+    {e:"Plane", s:"ගුවන් යානය", p:"pleɪn", ex:"Fly in plane", es:"ප්ලේන් එකේ පියාඹන්න"},
+    {e:"Tire", s:"ටයර් එක", p:"ˈtaɪə", ex:"Flat tire", es:"හුළං ගිය ටයර් එකක්"},
+    {e:"Engine", s:"එන්ජිම", p:"ˈɛnʤɪn", ex:"Start engine", es:"එන්ජිම ස්ටාට් කරන්න"},
+    {e:"Fuel", s:"ඉන්ධන/තෙල්", p:"fjʊəl", ex:"Need fuel", es:"තෙල් (ඉන්ධන) අවශ්‍යයි"},
+    {e:"Garage", s:"ගරාජය", p:"ˈgærɑːʒ", ex:"Car in garage", es:"ගරාජයේ තියෙන කාර් එක"},
+    {e:"Brake", s:"බ්‍රේක්", p:"breɪk", ex:"Hit the brake", es:"බ්‍රේක් ගහන්න"},
+    {e:"Seat", s:"ආසනය/සීට් එක", p:"siːt", ex:"Take a seat", es:"වාඩිවෙන්න (සීට් එකක් ගන්න)"},
+
+    // DAY 72: අධ්‍යාපනය - 2 (Education II)
+    {e:"University", s:"විශ්වවිද්‍යාලය", p:"ˌjuːnɪˈvɜːsɪti", ex:"Go to university", es:"විශ්වවිද්‍යාලයට යන්න"},
+    {e:"College", s:"විද්‍යාලය", p:"ˈkɒlɪʤ", ex:"City college", es:"නගරයේ විද්‍යාලය"},
+    {e:"Library", s:"පුස්තකාලය", p:"ˈlaɪbrəri", ex:"Quiet library", es:"නිහඬ පුස්තකාලයක්"},
+    {e:"Course", s:"පාඨමාලාව", p:"kɔːs", ex:"English course", es:"ඉංග්‍රීසි පාඨමාලාව"},
+    {e:"Degree", s:"උපාධිය", p:"dɪˈgriː", ex:"Get a degree", es:"උපාධියක් ලබාගන්න"},
+    {e:"Grade", s:"ශ්‍රේණිය/ලකුණු", p:"greɪd", ex:"Good grade", es:"හොඳ ලකුණක් (ශ්‍රේණියක්)"},
+    {e:"Project", s:"ව්‍යාපෘතිය", p:"ˈprɒʤɛkt", ex:"School project", es:"පාසල් ව්‍යාපෘතියක්"},
+    {e:"Result", s:"ප්‍රතිඵලය", p:"rɪˈzʌlt", ex:"Exam result", es:"විභාග ප්‍රතිඵලය"},
+    {e:"Bell", s:" සීනුව", p:"bɛl", ex:"Ring the bell", es:"බෙල් එක ගහන්න"},
+    {e:"Note", s:"සටහන", p:"nəʊt", ex:"Write a note", es:"සටහනක් ලියන්න"},
+
+    // DAY 73: විනෝදාස්වාදය (Entertainment)
+    {e:"Camera", s:"කැමරාව", p:"ˈkæmrə", ex:"Take photo", es:"ෆොටෝ එකක් ගන්න"},
+    {e:"Radio", s:"ගුවන් විදුලිය", p:"ˈreɪdɪəʊ", ex:"Listen to radio", es:"රේඩියෝ අහන්න"},
+    {e:"Channel", s:"නාලිකාව", p:"ˈʧænl", ex:"Change channel", es:"චැනල් එක මාරු කරන්න"},
+    {e:"Film", s:"චිත්‍රපටිය", p:"fɪlm", ex:"Watch a film", es:"ෆිල්ම් එකක් බලන්න"},
+    {e:"Screen", s:"තිරය", p:"skriːn", ex:"Big screen", es:"ලොකු තිරයක්"},
+    {e:"Stage", s:"වේදිකාව", p:"steɪʤ", ex:"On the stage", es:"වේදිකාව උඩ"},
+    {e:"Concert", s:"ප්‍රසංගය", p:"ˈkɒnsət", ex:"Music concert", es:"සංගීත ප්‍රසංගයක්"},
+    {e:"Band", s:"සංගීත කණ්ඩායම", p:"bænd", ex:"Rock band", es:"සංගීත කණ්ඩායමක්"},
+    {e:"Album", s:"ඇල්බමය", p:"ˈælbəm", ex:"Photo album", es:"ඡායාරූප ඇල්බමය"},
+    {e:"Media", s:"මාධ්‍ය", p:"ˈmiːdiə", ex:"Social media", es:"සමාජ මාධ්‍ය"},
+
+    // DAY 74: කාලගුණය සහ සෘතු (Seasons & Weather)
+    {e:"Season", s:"සෘතුව/කාලය", p:"ˈsiːzn", ex:"Rainy season", es:"වැසි කාලය"},
+    {e:"Summer", s:"ගිම්හානය (රස්නේ කාලය)", p:"ˈsʌmə", ex:"Hot summer", es:"රස්නේ කාලය"},
+    {e:"Winter", s:"ශීත කාලය", p:"ˈwɪntə", ex:"Cold winter", es:"ශීත කාලය"},
+    {e:"Weather", s:"කාලගුණය", p:"ˈwɛðə", ex:"Good weather", es:"හොඳ කාලගුණයක්"},
+    {e:"Climate", s:"දේශගුණය", p:"ˈklaɪmɪt", ex:"Hot climate", es:"උණුසුම් දේශගුණයක්"},
+    {e:"Heat", s:"උෂ්ණත්වය/රස්නය", p:"hiːt", ex:"Feel the heat", es:"රස්නය දැනෙනවා"},
+    {e:"Fog", s:"මීදුම", p:"fɒg", ex:"Thick fog", es:"ඝන මීදුම"},
+    {e:"Thunder", s:"අකුණ/ගිගුරුම", p:"ˈθʌndə", ex:"Loud thunder", es:"හයියෙන් ගිගුරනවා"},
+    {e:"Wave", s:"රළ", p:"weɪv", ex:"Sea wave", es:"මුහුදු රළ"},
+    {e:"Flood", s:"ගංවතුර", p:"flʌd", ex:"Big flood", es:"ලොකු ගංවතුරක්"},
+
+    // DAY 75: රැකියා - 2 (Jobs II)
+    {e:"Engineer", s:"ඉංජිනේරුවා", p:"ˌɛnʤɪˈnɪə", ex:"Civil engineer", es:"සිවිල් ඉංජිනේරුවෙක්"},
+    {e:"Manager", s:"කළමනාකරු", p:"ˈmænɪʤə", ex:"Bank manager", es:"බැංකු කළමනාකරු"},
+    {e:"Worker", s:"සේවකයා", p:"ˈwɜːkə", ex:"Factory worker", es:"කර්මාන්තශාලා සේවකයෙක්"},
+    {e:"Staff", s:"කාර්ය මණ්ඩලය", p:"stɑːf", ex:"Office staff", es:"කාර්යාලයේ ස්ටාෆ් එක"},
+    {e:"Clerk", s:"ලිපිකරු", p:"klɑːk", ex:"Bank clerk", es:"බැංකු ලිපිකරු"},
+    {e:"Officer", s:"නිලධාරියා", p:"ˈɒfɪsə", ex:"Police officer", es:"පොලිස් නිලධාරියා"},
+    {e:"Owner", s:"අයිතිකරු", p:"ˈəʊnə", ex:"Shop owner", es:"කඩේ අයිතිකාරයා"},
+    {e:"Servant", s:"සේවකයා/වැඩකාරයා", p:"ˈsɜːvənt", ex:"House servant", es:"ගෙදර වැඩ කරන කෙනා"},
+    {e:"Cook", s:"කෝකියා/උයන්නා", p:"kʊk", ex:"Good cook", es:"හොඳ කෝකියෙක්"},
+    {e:"Cleaner", s:"පිරිසිදු කරන්නා", p:"ˈkliːnə", ex:"Room cleaner", es:"කාමරය පිරිසිදු කරන්නා"},
+
+    // DAY 76: මුහුදේ සත්තු සහ කෘමීන් (Sea & Insects)
+    {e:"Ocean", s:"සාගරය/මහා මුහුද", p:"ˈəʊʃən", ex:"Deep ocean", es:"ගැඹුරු සාගරය"},
+    {e:"Shark", s:"මෝරා", p:"ʃɑːk", ex:"Big shark", es:"ලොකු මෝරෙක්"},
+    {e:"Whale", s:"තල්මසා", p:"weɪl", ex:"Blue whale", es:"නිල් තල්මසෙක්"},
+    {e:"Dolphin", s:"ඩොල්ෆින්", p:"ˈdɒlfɪn", ex:"Jump dolphin", es:"ඩොල්ෆින් පනිනවා"},
+    {e:"Crab", s:"කකුළුවා", p:"kræb", ex:"Red crab", es:"රතු කකුළුවෙක්"},
+    {e:"Fly", s:"මැස්සා", p:"flaɪ", ex:"Shoo the fly", es:"මැස්සා එලවන්න"},
+    {e:"Mosquito", s:"මදුරුවා", p:"məsˈkiːtəʊ", ex:"Mosquito bite", es:"මදුරුවෙක් කෑවා"},
+    {e:"Bug", s:"කෘමියා", p:"bʌg", ex:"Small bug", es:"පොඩි සතෙක් (කෘමියෙක්)"},
+    {e:"Worm", s:"පණුවා", p:"wɜːm", ex:"Earth worm", es:"ගැඩවිලා (පණුවා)"},
+    {e:"Shell", s:"කටුව/සිප්පිය", p:"ʃɛl", ex:"Sea shell", es:"මුහුදු බෙල්ලෙක්"},
+
+    // DAY 77: ශරීර අවයව - 3 (Body III)
+    {e:"Thumb", s:"මාපටැඟිල්ල", p:"θʌm", ex:"Thumbs up", es:"නියමයි (මාපටැඟිල්ල දික් කිරීම)"},
+    {e:"Toe", s:"පාදයේ ඇඟිල්ල", p:"təʊ", ex:"Big toe", es:"කකුලේ මහපට ඇඟිල්ල"},
+    {e:"Nail", s:"නියපොත්ත", p:"neɪl", ex:"Cut nail", es:"නියපොතු කපන්න"},
+    {e:"Beard", s:"රැවුල", p:"bɪəd", ex:"Long beard", es:"දිග රැවුලක්"},
+    {e:"Cheek", s:"කම්මුල", p:"ʧiːk", ex:"Red cheek", es:"රතු පාට කම්මුලක්"},
+    {e:"Chin", s:"නිකට", p:"ʧɪn", ex:"Touch chin", es:"නිකට අල්ලන්න"},
+    {e:"Throat", s:"උගුර", p:"θrəʊt", ex:"Sore throat", es:"උගුරේ අමාරුවක්"},
+    {e:"Tongue", s:"දිව", p:"tʌŋ", ex:"Pink tongue", es:"රෝස පාට දිවක්"},
+    {e:"Lip", s:"තොල", p:"lɪp", ex:"Red lip", es:"රතු පාට තොලක්"},
+    {e:"Waist", s:"ඉන", p:"weɪst", ex:"Slim waist", es:"සිහින් ඉණක්"},
+
+    // DAY 78: සමාජීය විශේෂණ (Public Adjectives)
+    {e:"Public", s:"පොදු/මහජන", p:"ˈpʌblɪk", ex:"Public bus", es:"පොදු බස් රථයක්"},
+    {e:"Private", s:"පෞද්ගලික", p:"ˈpraɪvɪt", ex:"Private car", es:"පෞද්ගලික කාර් එකක්"},
+    {e:"Special", s:"විශේෂ", p:"ˈspɛʃəl", ex:"Special day", es:"විශේෂ දවසක්"},
+    {e:"General", s:"සාමාන්‍ය/පොදු", p:"ˈʤɛnərəl", ex:"General knowledge", es:"සාමාන්‍ය දැනීම"},
+    {e:"Main", s:"ප්‍රධාන", p:"meɪn", ex:"Main road", es:"ප්‍රධාන පාර"},
+    {e:"Local", s:"දේශීය/ප්‍රාදේශීය", p:"ˈləʊkəl", ex:"Local food", es:"දේශීය කෑම"},
+    {e:"National", s:"ජාතික", p:"ˈnæʃənl", ex:"National flag", es:"ජාතික කොඩිය"},
+    {e:"International", s:"ජාත්‍යන්තර", p:"ˌɪntə(ː)ˈnæʃənl", ex:"International school", es:"ජාත්‍යන්තර පාසලක්"},
+    {e:"Foreign", s:"විදේශීය", p:"ˈfɒrɪn", ex:"Foreign country", es:"පිටරටක් (විදේශ රටක්)"},
+    {e:"Native", s:"දේශීය/උපන්", p:"ˈneɪtɪv", ex:"Native speaker", es:"මව් භාෂාව කතා කරන්නෙක්"},
+
+    // DAY 79: චලනයන් - 2 (Movement II)
+    {e:"Climb", s:"නගිනවා (කන්දක්/ගහක්)", p:"klaɪm", ex:"Climb tree", es:"ගසකට නගින්න"},
+    {e:"Crawl", s:"බඩගානවා", p:"krɔːl", ex:"Baby crawls", es:"බබා බඩගානවා"},
+    {e:"Slide", s:"ලිස්සනවා", p:"slaɪd", ex:"Slide down", es:"පහළට ලිස්සන්න"},
+    {e:"Slip", s:"ලිස්සා වැටෙනවා", p:"slɪp", ex:"Do not slip", es:"ලිස්සලා වැටෙන්න එපා"},
+    {e:"Shake", s:"සොලවනවා", p:"ʃeɪk", ex:"Shake hands", es:"අතට අත දෙන්න (ෂේක් හෑන්ඩ්)"},
+    {e:"Swing", s:"පද්දෙනවා/පද්දනවා", p:"swɪŋ", ex:"Swing set", es:"ඔංචිල්ලාව පදින්න"},
+    {e:"Bend", s:"නැමෙනවා/නවනවා", p:"bɛnd", ex:"Bend knees", es:"දණහිස් නවන්න"},
+    {e:"Stretch", s:"ඇදෙනවා/දිග අරිනවා", p:"strɛʧ", ex:"Stretch arms", es:"අත් දෙක දිග අරින්න"},
+    {e:"Bow", s:"හිස නමා ආචාර කරනවා", p:"baʊ", ex:"Bow down", es:"හිස නමන්න"},
+    {e:"Dive", s:"කිමිදෙනවා/පනිනවා", p:"daɪv", ex:"Dive into pool", es:"වතුරට පනින්න (කිමිදෙන්න)"},
+
+    // DAY 80: ගෙදර දොරේ බඩු - 2 (Household II)
+    {e:"Broom", s:"කොස්ස", p:"bruːm", ex:"Sweep with broom", es:"කොස්සෙන් අතුගාන්න"},
+    {e:"Bucket", s:"බාල්දිය", p:"ˈbʌkɪt", ex:"Water bucket", es:"වතුර බාල්දියක්"},
+    {e:"Pillow", s:"කොට්ටය", p:"ˈpɪləʊ", ex:"Soft pillow", es:"මෘදු කොට්ටයක්"},
+    {e:"Blanket", s:"පොරවන රෙද්ද", p:"ˈblæŋkɪt", ex:"Warm blanket", es:"උණුසුම් පොරවනයක්"},
+    {e:"Sheet", s:"ඇඳ ඇතිරිල්ල", p:"ʃiːt", ex:"Clean sheet", es:"පිරිසිදු ඇතිරිල්ලක්"},
+    {e:"Carpet", s:"කාපට් එක", p:"ˈkɑːpɪt", ex:"Red carpet", es:"රතු පාට කාපට් එක"},
+    {e:"Curtain", s:"ජනෙල් රෙද්ද", p:"ˈkɜːtn", ex:"Close curtain", es:"කර්ටන් එක වහන්න"},
+    {e:"Shelf", s:"රාක්කය", p:"ʃɛlf", ex:"Book shelf", es:"පොත් රාක්කය"},
+    {e:"Drawer", s:"ලාච්චුව", p:"drɔː", ex:"Open drawer", es:"ලාච්චුව අරින්න"},
+    {e:"Basket", s:"කූඩය", p:"ˈbɑːskɪt", ex:"Fruit basket", es:"පළතුරු කූඩය"}
+);
+
+/* --- PART 10: WORDS 801 - 900 (Days 81-90) --- */
+fullData.push(
+    // DAY 81: ගණිතය සහ හැඩතල (Math & Shapes)
+    {e:"Count", s:"ගණන් කරනවා", p:"kaʊnt", ex:"Count to ten", es:"දහයට ගණන් කරන්න"},
+    {e:"Add", s:"එකතු කරනවා", p:"æd", ex:"Add numbers", es:"ඉලක්කම් එකතු කරන්න"},
+    {e:"Minus", s:"අඩු කිරීම", p:"ˈmaɪnəs", ex:"Five minus two", es:"පහෙන් දෙකක් අඩු කරන්න"},
+    {e:"Divide", s:"බෙදනවා", p:"dɪˈvaɪd", ex:"Divide by two", es:"දෙකෙන් බෙදන්න"},
+    {e:"Equal", s:"සමාන", p:"ˈiːkwəl", ex:"Equal parts", es:"සමාන කොටස්"},
+    {e:"Plus", s:"ධන/එකතු", p:"plʌs", ex:"One plus one", es:"එකයි එකයි (එකතු කිරීම)"},
+    {e:"Zero", s:"බිංදුව", p:"ˈzɪərəʊ", ex:"Number zero", es:"බිංදුව (ඉලක්කම)"},
+    {e:"Shape", s:"හැඩය", p:"ʃeɪp", ex:"Round shape", es:"රවුම් හැඩයක්"},
+    {e:"Angle", s:"කෝණය", p:"ˈæŋgl", ex:"Right angle", es:"සෘජු කෝණයක්"},
+    {e:"Space", s:"ඉඩ/අවකාශය", p:"speɪs", ex:"Empty space", es:"හිස් ඉඩක්"},
+
+    // DAY 82: අමුද්‍රව්‍ය සහ ලෝහ (Materials II)
+    {e:"Copper", s:"තඹ", p:"ˈkɒpə", ex:"Copper wire", es:"තඹ කම්බියක්"},
+    {e:"Steel", s:"වානේ", p:"stiːl", ex:"Strong steel", es:"ශක්තිමත් වානේ"},
+    {e:"Brick", s:"ගඩොල්", p:"brɪk", ex:"Red brick", es:"රතු ගඩොල්"},
+    {e:"Sand", s:"වැලි", p:"sænd", ex:"White sand", es:"සුදු වැලි"},
+    {e:"Clay", s:"මැටි", p:"kleɪ", ex:"Clay pot", es:"මැටි මුට්ටියක්"},
+    {e:"Leather", s:"සම්", p:"ˈlɛðə", ex:"Leather bag", es:"සම් බෑගයක්"},
+    {e:"Silk", s:"සේද", p:"sɪlk", ex:"Silk dress", es:"සේද ඇඳුමක්"},
+    {e:"Wool", s:"ලොම් (රෙදි)", p:"wʊl", ex:"Wool jacket", es:"ලොම් ජැකට් එකක්"},
+    {e:"Rubber", s:"රබර්", p:"ˈrʌbə", ex:"Rubber ball", es:"රබර් බෝලයක්"},
+    {e:"Wax", s:"ඉටි", p:"wæks", ex:"Candle wax", es:"ඉටිපන්දම් ඉටි"},
+
+    // DAY 83: ආගම සහ විශ්වාස (Religion)
+    {e:"God", s:"දෙවියන්", p:"gɒd", ex:"Pray to God", es:"දෙවියන්ට වඳින්න"},
+    {e:"Temple", s:"පන්සල/කෝවිල", p:"ˈtɛmpl", ex:"Go to temple", es:"පන්සලට යන්න"},
+    {e:"Church", s:"පල්ලිය", p:"ʧɜːʧ", ex:"Old church", es:"පරණ පල්ලියක්"},
+    {e:"Mosque", s:"මුස්ලිම් පල්ලිය", p:"mɒsk", ex:"Visit mosque", es:"පල්ලියට යන්න"},
+    {e:"Pray", s:"යාඥා කරනවා/වඳිනවා", p:"preɪ", ex:"Pray daily", es:"දිනපතා වඳින්න (යාඥා කරන්න)"},
+    {e:"Soul", s:"ආත්මය", p:"səʊl", ex:"Good soul", es:"හොඳ ආත්මයක්"},
+    {e:"Spirit", s:"ආත්මය/ගතිය", p:"ˈspɪrɪt", ex:"Team spirit", es:"කණ්ඩායම් හැඟීම"},
+    {e:"Ghost", s:"භූතයා", p:"gəʊst", ex:"Scary ghost", es:"බය හිතෙන භූතයෙක්"},
+    {e:"Angel", s:"සුර දූතයා", p:"ˈeɪnʤəl", ex:"Little angel", es:"පුංචි සුර දූතයෙක්"},
+    {e:"Faith", s:"විශ්වාසය/ඇදහීම", p:"feɪθ", ex:"Keep faith", es:"විශ්වාසය තියාගන්න"},
+
+    // DAY 84: නීතිය සහ අපරාධ (Law & Crime)
+    {e:"Crime", s:"අපරාධය", p:"kraɪm", ex:"Stop crime", es:"අපරාධ නවත්වන්න"},
+    {e:"Thief", s:"හොරා", p:"θiːf", ex:"Catch thief", es:"හොරා අල්ලන්න"},
+    {e:"Steal", s:"හොරකම් කරනවා", p:"stiːl", ex:"Do not steal", es:"හොරකම් කරන්න එපා"},
+    {e:"Kill", s:"මරනවා", p:"kɪl", ex:"Do not kill", es:"මරන්න එපා (සත්තු)"},
+    {e:"Attack", s:"පහර දෙනවා", p:"əˈtæk", ex:"Attack enemy", es:"සතුරාට පහර දෙන්න"},
+    {e:"Fight", s:"සටන් කරනවා/ගහගන්නවා", p:"faɪt", ex:"Do not fight", es:"ගහගන්න එපා"},
+    {e:"Gun", s:"තුවක්කුව", p:"gʌn", ex:"Loud gun", es:"ශබ්ද තුවක්කුවක්"},
+    {e:"Shoot", s:"වෙඩි තියනවා", p:"ʃuːt", ex:"Shoot target", es:"ඉලක්කයට වෙඩි තියන්න"},
+    {e:"Prison", s:"හිරගෙදර", p:"ˈprɪzn", ex:"Go to prison", es:"හිරගෙදරට යන්න"},
+    {e:"Court", s:"උසාවිය", p:"kɔːt", ex:"Law court", es:"උසාවියට යන්න"},
+
+    // DAY 85: දේශපාලනය සහ රට (Politics)
+    {e:"Vote", s:"ඡන්දය දෙනවා", p:"vəʊt", ex:"Vote today", es:"අද ඡන්දය දෙන්න"},
+    {e:"Leader", s:"නායකයා", p:"ˈliːdə", ex:"Good leader", es:"හොඳ නායකයෙක්"},
+    {e:"Member", s:"සාමාජිකයා", p:"ˈmɛmbə", ex:"Club member", es:"සංගමයේ සාමාජිකයෙක්"},
+    {e:"Minister", s:"ඇමති", p:"ˈmɪnɪstə", ex:"Prime minister", es:"අගමැති තුමා"},
+    {e:"President", s:"ජනාධිපති", p:"ˈprɛzɪdənt", ex:"Meet president", es:"ජනාධිපති හමුවන්න"},
+    {e:"Right", s:"අයිතිය", p:"raɪt", ex:"Human right", es:"මානව අයිතිවාසිකම්"},
+    {e:"Rule", s:"නීතිය/පාලනය", p:"ruːl", ex:"Follow rule", es:"නීතිය අනුගමනය කරන්න"},
+    {e:"Tax", s:"බදු", p:"tæks", ex:"Pay tax", es:"බදු ගෙවන්න"},
+    {e:"Flag", s:"කොඩිය", p:"flæg", ex:"National flag", es:"ජාතික කොඩිය"},
+    {e:"Nation", s:"ජාතිය", p:"ˈneɪʃən", ex:"One nation", es:"එක ජාතියක්"},
+
+    // DAY 86: සෞඛ්‍ය ගැටළු (Health Problems)
+    {e:"Fever", s:"උණ", p:"ˈfiːvə", ex:"High fever", es:"තද උණ"},
+    {e:"Cough", s:"කැස්ස", p:"kɒf", ex:"Bad cough", es:"කැස්ස (නරක විදිහට)"},
+    {e:"Cold", s:"සෙම්ප්‍රතිශ්‍යාව", p:"kəʊld", ex:"Catch a cold", es:"සෙම්ප්‍රතිශ්‍යාව හැදෙනවා"},
+    {e:"Wound", s:"තුවාලය", p:"wuːnd", ex:"Deep wound", es:"ගැඹුරු තුවාලයක්"},
+    {e:"Burn", s:"පිච්චෙනවා", p:"bɜːn", ex:"Fire burn", es:"ගින්නට පිච්චෙනවා"},
+    {e:"Hurt", s:"රිදෙනවා", p:"hɜːt", ex:"It hurts", es:"ඒක රිදෙනවා"},
+    {e:"Dizzy", s:"කරකැවිල්ල", p:"ˈdɪzi", ex:"Feel dizzy", es:"කරකැවිල්ල වගේ දැනෙනවා"},
+    {e:"Vomit", s:"වමනය යනවා", p:"ˈvɒmɪt", ex:"Feel vomit", es:"වමනය යන්න වගේ"},
+    {e:"Blind", s:"අන්ධ", p:"blaɪnd", ex:"Blind man", es:"අන්ධ මිනිසෙක්"},
+    {e:"Deaf", s:"බිහිරි", p:"dɛf", ex:"Deaf person", es:"බිහිරි කෙනෙක්"},
+
+    // DAY 87: හැඟීම් සහ ගතිගුණ (Emotions II)
+    {e:"Proud", s:"ආඩම්බරයි", p:"praʊd", ex:"Proud father", es:"ආඩම්බර තාත්තා කෙනෙක්"},
+    {e:"Jealous", s:"ඊර්ෂ්‍යා", p:"ˈʤɛləs", ex:"Jealous guy", es:"ඊර්ෂ්‍යාකාර මිනිහෙක්"},
+    {e:"Bored", s:"කම්මැලි (හිතිලා)", p:"bɔːd", ex:"I am bored", es:"මට කම්මැලියි (කරන්න දෙයක් නැති නිසා)"},
+    {e:"Excited", s:"උද්යෝගිමත්", p:"ɪkˈsaɪtɪd", ex:"So excited", es:"ගොඩක් සතුටුයි (උද්යෝගිමත්)"},
+    {e:"Nervous", s:"කලබලයි/බයයි", p:"ˈnɜːvəs", ex:"Feel nervous", es:"බයයි වගේ දැනෙනවා"},
+    {e:"Worried", s:"කනස්සල්ලෙන්", p:"ˈwʌrid", ex:"Do not worry", es:"කලබල වෙන්න එපා (කනස්සල්ල වෙන්න එපා)"},
+    {e:"Calm", s:"සන්සුන්", p:"kɑːm", ex:"Keep calm", es:"සන්සුන්ව ඉන්න"},
+    {e:"Lucky", s:"වාසනාවන්ත", p:"ˈlʌki", ex:"Lucky day", es:"වාසනාවන්ත දවසක්"},
+    {e:"Crazy", s:"පිස්සු", p:"ˈkreɪzi", ex:"Crazy dog", es:"පිස්සු බල්ලෙක්"},
+    {e:"Strange", s:"පුදුම/අමුතු", p:"streɪnʤ", ex:"Strange story", es:"පුදුම හිතෙන කතාවක්"},
+
+    // DAY 88: පරිසරය (Environment)
+    {e:"Forest", s:"කැලෑව", p:"ˈfɒrɪst", ex:"Green forest", es:"කොළ පාට කැලෑවක්"},
+    {e:"Desert", s:"කාන්තාරය", p:"ˈdɛzət", ex:"Hot desert", es:"රස්නේ කාන්තාරයක්"},
+    {e:"Mountain", s:"කන්ද", p:"ˈmaʊntɪn", ex:"High mountain", es:"උස කන්දක්"},
+    {e:"Valley", s:"නිම්නය", p:"ˈvæli", ex:"Deep valley", es:"ගැඹුරු නිම්නයක්"},
+    {e:"Lake", s:"වැව/විල", p:"leɪk", ex:"Blue lake", es:"නිල් පාට විලක්"},
+    {e:"Pond", s:"පොකුණ", p:"pɒnd", ex:"Fish pond", es:"මාළු පොකුණක්"},
+    {e:"Cave", s:"ගුහාව", p:"keɪv", ex:"Dark cave", es:"අඳුරු ගුහාවක්"},
+    {e:"Rock", s:"ගල", p:"rɒk", ex:"Hard rock", es:"තද ගලක්"},
+    {e:"Field", s:"වෙල/පිට්ටනිය", p:"fiːld", ex:"Play field", es:"සෙල්ලම් පිට්ටනිය"},
+    {e:"Farm", s:"ගොවිපළ", p:"fɑːm", ex:"Cow farm", es:"එළ ගව ගොවිපළක්"},
+
+    // DAY 89: කාලය - 2 (Time Expressions)
+    {e:"Yesterday", s:"ඊයේ", p:"ˈjɛstədeɪ", ex:"Yesterday morning", es:"ඊයේ උදේ"},
+    {e:"Tomorrow", s:"හෙට", p:"təˈmɒrəʊ", ex:"See you tomorrow", es:"හෙට හමුවෙමු"},
+    {e:"Tonight", s:"අද රෑ", p:"təˈnaɪt", ex:"Party tonight", es:"අද රෑ පාටියක්"},
+    {e:"Midnight", s:"මධ්‍යම රාත්‍රිය", p:"ˈmɪdnaɪt", ex:"At midnight", es:"මධ්‍යම රාත්‍රියේදී"},
+    {e:"Noon", s:"දහවල්", p:"nuːn", ex:"High noon", es:"හරියටම දවල් 12ට"},
+    {e:"Past", s:"අතීතය/පහු වෙලා", p:"pɑːst", ex:"In the past", es:"අතීතයේදී"},
+    {e:"Future", s:"අනාගතය", p:"ˈfjuːʧə", ex:"Bright future", es:"දීප්තිමත් අනාගතයක්"},
+    {e:"Present", s:"වර්තමානය/තෑග්ග", p:"ˈprɛznt", ex:"Present time", es:"වර්තමාන කාලය"},
+    {e:"While", s:"අතරතුර", p:"waɪl", ex:"Wait a while", es:"ටිකක් ඉන්න (ටික වෙලාවක්)"},
+    {e:"During", s:"අතරතුර/තුළ", p:"ˈdjʊərɪŋ", ex:"During the day", es:"දවස ඇතුලත"},
+
+    // DAY 90: මෙවලම් (Tools)
+    {e:"Hammer", s:"මිටිය", p:"ˈhæmə", ex:"Hit with hammer", es:"මිටියෙන් ගහන්න"},
+    {e:"Nail", s:"ඇණය", p:"neɪl", ex:"Iron nail", es:"යකඩ ඇණයක්"},
+    {e:"Screw", s:"ඇණය (දඟර)", p:"skruː", ex:"Tight screw", es:"තද ඇණයක්"},
+    {e:"Saw", s:"කියත", p:"sɔː", ex:"Cut with saw", es:"කියතෙන් කපන්න"},
+    {e:"Drill", s:"විදින කටුව", p:"drɪl", ex:"Drill a hole", es:"හිලක් විදින්න"},
+    {e:"Rope", s:"ලණුව", p:"rəʊp", ex:"Long rope", es:"දිග ලණුවක්"},
+    {e:"Wire", s:"වයර් එක", p:"ˈwaɪə", ex:"Copper wire", es:"තඹ වයර් එකක්"},
+    {e:"Pump", s:"පොම්පය", p:"pʌmp", ex:"Water pump", es:"වතුර පොම්පය"},
+    {e:"Ladder", s:"ඉනිමග", p:"ˈlædə", ex:"Climb ladder", es:"ඉනිමගට නගින්න"},
+    {e:"Tool", s:"මෙවලම", p:"tuːl", ex:"Garden tool", es:"වතු වැඩ කරන මෙවලම්"}
+);
+
+/* --- PART 11: WORDS 901 - 1000 (Days 91-100) --- */
+fullData.push(
+    // DAY 91: සම්භාවිතාව (Probability)
+    {e:"Maybe", s:"සමහරවිට", p:"ˈmeɪbiː", ex:"Maybe tomorrow", es:"සමහරවිට හෙට"},
+    {e:"Probably", s:"බොහෝ දුරට", p:"ˈprɒbəbli", ex:"Probably yes", es:"බොහෝ දුරට ඔව්"},
+    {e:"Possible", s:"පුළුවන්/විය හැකි", p:"ˈpɒsəbl", ex:"It is possible", es:"ඒක වෙන්න පුළුවන් දෙයක්"},
+    {e:"Impossible", s:"නොවිය හැකි/බැරි", p:"ɪmˈpɒsəbl", ex:"Mission impossible", es:"කරන්න බැරි වැඩක්"},
+    {e:"Certain", s:"නිශ්චිත/ෂුවර්", p:"ˈsɜːtn", ex:"I am certain", es:"මට ඒක විශ්වාසයි (ෂුවර්)"},
+    {e:"Chance", s:"අවස්ථාව", p:"ʧɑːns", ex:"One more chance", es:"තව එක අවස්ථාවක්"},
+    {e:"Risk", s:"අවදානම", p:"rɪsk", ex:"Take a risk", es:"අවදානමක් ගන්න"},
+    {e:"Luck", s:"වාසනාව", p:"lʌk", ex:"Good luck", es:"සුබ පැතුම් (වාසනාව)"},
+    {e:"Fact", s:"කරුණ/ඇත්ත", p:"fækt", ex:"True fact", es:"සත්‍ය කරුණක්"},
+    {e:"Truth", s:"සත්‍යය", p:"truːθ", ex:"Tell the truth", es:"ඇත්ත කියන්න"},
+
+    // DAY 92: ව්‍යාපාරික වචන (Business II)
+    {e:"Company", s:"සමාගම", p:"ˈkʌmpəni", ex:"Big company", es:"ලොකු සමාගමක්"},
+    {e:"Department", s:"දෙපාර්තමේන්තුව", p:"dɪˈpɑːtmənt", ex:"Sales department", es:"විකුණුම් දෙපාර්තමේන්තුව"},
+    {e:"Meeting", s:"රැස්වීම", p:"ˈmiːtɪŋ", ex:"Start meeting", es:"රැස්වීම පටන් ගන්න"},
+    {e:"Report", s:"වාර්තාව", p:"rɪˈpɔːt", ex:"Daily report", es:"දෛනික වාර්තාව"},
+    {e:"Contract", s:"ගිවිසුම", p:"ˈkɒntrækt", ex:"Sign contract", es:"ගිවිසුම අත්සන් කරන්න"},
+    {e:"Product", s:"නිෂ්පාදනය", p:"ˈprɒdʌkt", ex:"New product", es:"නව නිෂ්පාදනයක්"},
+    {e:"Service", s:"සේවාව", p:"ˈsɜːvɪs", ex:"Good service", es:"හොඳ සේවාවක්"},
+    {e:"Customer", s:"පාරිභෝගිකයා", p:"ˈkʌstəmə", ex:"Happy customer", es:"සතුටුදායක පාරිභෝගිකයෙක්"},
+    {e:"Profit", s:"ලාභය", p:"ˈprɒfɪt", ex:"High profit", es:"ඉහළ ලාභයක්"},
+    {e:"Loss", s:"පාඩුව", p:"lɒs", ex:"Big loss", es:"ලොකු පාඩුවක්"},
+
+    // DAY 93: විද්‍යාව සහ තාක්ෂණය (Science & Tech)
+    {e:"Science", s:"විද්‍යාව", p:"ˈsaɪəns", ex:"Study science", es:"විද්‍යාව ඉගෙන ගන්න"},
+    {e:"Machine", s:"යන්ත්‍රය", p:"məˈʃiːn", ex:"Big machine", es:"ලොකු මැෂින් එකක්"},
+    {e:"Motor", s:"මෝටරය", p:"ˈməʊtə", ex:"Electric motor", es:"විදුලි මෝටරයක්"},
+    {e:"Robot", s:"රොබෝ", p:"ˈrəʊbɒt", ex:"Smart robot", es:"බුද්ධිමත් රොබෝ කෙනෙක්"},
+    {e:"Device", s:"උපකරණය", p:"dɪˈvaɪs", ex:"New device", es:"අලුත් උපකරණයක් (ඩිවයිස් එකක්)"},
+    {e:"Switch", s:"ස්විචය", p:"swɪʧ", ex:"Light switch", es:"ලයිට් ස්විචය"},
+    {e:"Wire", s:"වයර් එක/කම්බිය", p:"ˈwaɪə", ex:"Copper wire", es:"තඹ කම්බියක්"},
+    {e:"Energy", s:"ශක්තිය", p:"ˈɛnəʤi", ex:"Solar energy", es:"සූර්ය ශක්තිය"},
+    {e:"Force", s:"බලය", p:"fɔːs", ex:"Strong force", es:"ලොකු බලයක්"},
+    {e:"Solid", s:"ඝන", p:"ˈsɒlɪd", ex:"Solid rock", es:"ඝන ගලක්"},
+
+    // DAY 94: මිනුම් ඒකක (Units)
+    {e:"Meter", s:"මීටරය", p:"ˈmiːtə", ex:"One meter", es:"එක මීටරයක්"},
+    {e:"Liter", s:"ලීටරය", p:"ˈliːtə", ex:"Liter of milk", es:"කිරි ලීටරයක්"},
+    {e:"Gram", s:"ග්‍රෑම්", p:"græm", ex:"500 grams", es:"ග්‍රෑම් 500ක්"},
+    {e:"Kilo", s:"කිලෝ", p:"ˈkiːləʊ", ex:"Kilo of rice", es:"හාල් කිලෝවක්"},
+    {e:"Inch", s:"අඟල", p:"ɪnʧ", ex:"Two inches", es:"අඟල් දෙකක්"},
+    {e:"Mile", s:"හැතැක්ම", p:"maɪl", ex:"Ten miles", es:"හැතැක්ම දහයක්"},
+    {e:"Piece", s:"කෑල්ල", p:"piːs", ex:"Piece of cake", es:"කේක් කෑල්ලක්"},
+    {e:"Pair", s:"ජෝඩුව/කුට්ටම", p:"peə", ex:"Pair of shoes", es:"සපත්තු කුට්ටමක්"},
+    {e:"Set", s:"කට්ටලය/සෙට් එක", p:"sɛt", ex:"Tea set", es:"තේ කෝප්ප සෙට් එකක්"},
+    {e:"Dozen", s:"දුසිම (12)", p:"ˈdʌzn", ex:"Dozen eggs", es:"බිත්තර දුසිමක්"},
+
+    // DAY 95: සොබාදහම - අමතර (Nature Extras)
+    {e:"Universe", s:"විශ්වය", p:"ˈjuːnɪvɜːs", ex:"Big universe", es:"විශාල විශ්වය"},
+    {e:"Galaxy", s:"මන්දාකිනිය", p:"ˈgæləksi", ex:"Star galaxy", es:"තාරකා මන්දාකිනියක්"},
+    {e:"Soil", s:"පස්", p:"sɔɪl", ex:"Fertile soil", es:"සරු පස්"},
+    {e:"Ash", s:"අළු", p:"æʃ", ex:"Fire ash", es:"ගිනි අළු"},
+    {e:"Diamond", s:"දියමන්ති", p:"ˈdaɪəmənd", ex:"Shiny diamond", es:"දිලිසෙන දියමන්තියක්"},
+    {e:"Crystal", s:"පළිඟු", p:"ˈkrɪstl", ex:"Clear crystal", es:"පැහැදිලි පළිඟුවක්"},
+    {e:"Pearl", s:"මුතු", p:"pɜːl", ex:"White pearl", es:"සුදු මුතු ඇටයක්"},
+    {e:"Shadow", s:"සෙවනැල්ල", p:"ˈʃædəʊ", ex:"Dark shadow", es:"අඳුරු සෙවනැල්ලක්"},
+    {e:"Light", s:"ආලෝකය", p:"laɪt", ex:"Sun light", es:"සූර්යාලෝකය"},
+    {e:"Heat", s:"උණුසුම", p:"hiːt", ex:"Summer heat", es:"ග්‍රීෂ්ම උණුසුම"},
+
+    // DAY 96: සමාජය සහ සංස්කෘතිය (Society)
+    {e:"Culture", s:"සංස්කෘතිය", p:"ˈkʌlʧə", ex:"Our culture", es:"අපේ සංස්කෘතිය"},
+    {e:"Society", s:"සමාජය", p:"səˈsaɪəti", ex:"Modern society", es:"නූතන සමාජය"},
+    {e:"Education", s:"අධ්‍යාපනය", p:"ˌɛdju(ː)ˈkeɪʃən", ex:"Good education", es:"හොඳ අධ්‍යාපනයක්"},
+    {e:"Health", s:"සෞඛ්‍යය", p:"hɛlθ", ex:"Good health", es:"හොඳ සෞඛ්‍යයක්"},
+    {e:"System", s:"පද්ධතිය/සිස්ටම්", p:"ˈsɪstɪm", ex:"Computer system", es:"පරිගණක පද්ධතියක්"},
+    {e:"Program", s:"වැඩසටහන", p:"ˈprəʊgræm", ex:"TV program", es:"ටීවී වැඩසටහනක්"},
+    {e:"Case", s:"නඩුව/සිද්ධිය", p:"keɪs", ex:"Court case", es:"උසාවි නඩුවක්"},
+    {e:"Government", s:"ආණ්ඩුව", p:"ˈgʌvnmənt", ex:"The government", es:"ආණ්ඩුව (රජය)"},
+    {e:"Army", s:"හමුදාව", p:"ˈɑːmi", ex:"Join army", es:"හමුදාවට බැඳෙන්න"},
+    {e:"Success", s:"සාර්ථකත්වය", p:"səkˈsɛs", ex:"Work for success", es:"සාර්ථකත්වය වෙනුවෙන් වැඩ කරන්න"},
+
+    // DAY 97: කෑම අමුද්‍රව්‍ය (Ingredients)
+    {e:"Sauce", s:"සෝස්", p:"sɔːs", ex:"Tomato sauce", es:"තක්කාලි සෝස්"},
+    {e:"Spice", s:"කුළුබඩු", p:"spaɪs", ex:"Hot spice", es:"සැර කුළුබඩු"},
+    {e:"Cream", s:"ක්‍රීම්", p:"kriːm", ex:"Ice cream", es:"අයිස් ක්‍රීම්"},
+    {e:"Cheese", s:"චීස්", p:"ʧiːz", ex:"Eat cheese", es:"චීස් කන්න"},
+    {e:"Butter", s:"බටර්", p:"ˈbʌtə", ex:"Bread and butter", es:"පාන් සහ බටර්"},
+    {e:"Fat", s:"මේදය", p:"fæt", ex:"Low fat", es:"අඩු මේදය"},
+    {e:"Meat", s:"මස්", p:"miːt", ex:"Eat meat", es:"මස් කන්න"},
+    {e:"Beef", s:"හරක් මස්", p:"biːf", ex:"Roast beef", es:"රෝස්ට් කරපු බීෆ්"},
+    {e:"Pork", s:"ඌරු මස්", p:"pɔːk", ex:"Pork curry", es:"ඌරු මස් කරියක්"},
+    {e:"Flour", s:" පිටි", p:"ˈflaʊə", ex:"Wheat flour", es:"තිරිඟු පිටි"},
+
+    // DAY 98: නිපාත පද (Prepositions II)
+    {e:"Since", s:"සිට/නිසා", p:"sɪns", ex:"Since morning", es:"උදේ ඉඳන් (සිට)"},
+    {e:"Until", s:"දක්වා/වෙනකම්", p:"ənˈtɪl", ex:"Until night", es:"රෑ වෙනකම්"},
+    {e:"Against", s:"විරුද්ධව", p:"əˈgɛnst", ex:"Against the wall", es:"බිත්තියට හේත්තු වී"},
+    {e:"Without", s:"නැතුව", p:"wɪˈðaʊt", ex:"Without you", es:"ඔයා නැතුව"},
+    {e:"Within", s:"ඇතුළත", p:"wɪˈðɪn", ex:"Within an hour", es:"පැයක් ඇතුළත"},
+    {e:"About", s:"ගැන", p:"əˈbaʊt", ex:"About the movie", es:"චිත්‍රපටිය ගැන"},
+    {e:"Among", s:"අතර (ගොඩක්)", p:"əˈmʌŋ", ex:"Among friends", es:"යාළුවො අතරේ"},
+    {e:"Upon", s:"මත/උඩ", p:"əˈpɒn", ex:"Once upon a time", es:"එකමත් එක කාලෙක"},
+    {e:"During", s:"අතරතුර", p:"ˈdjʊərɪŋ", ex:"During class", es:"පන්තිය අතරතුර"},
+    {e:"While", s:"අතරතුර (While)", p:"waɪl", ex:"While walking", es:"ඇවිදින අතරතුර"},
+
+    // DAY 99: කුඩා උපකරණ (Small Items)
+    {e:"String", s:"නූල (ගන)", p:"strɪŋ", ex:"Tie with string", es:"නූලෙන් ගැටගහන්න"},
+    {e:"Thread", s:"නූල (මහන)", p:"θrɛd", ex:"Needle and thread", es:"ඉඳිකටුව සහ නූල"},
+    {e:"Needle", s:"ඉඳිකටුව", p:"ˈniːdl", ex:"Sharp needle", es:"තියුණු ඉඳිකටුවක්"},
+    {e:"Pin", s:"පින් එක/කටුව", p:"pɪn", ex:"Safety pin", es:"සේෆ්ටි පින් එකක්"},
+    {e:"Clip", s:"ක්ලිප් එක", p:"klɪp", ex:"Paper clip", es:"කඩදාසි ක්ලිප් එකක්"},
+    {e:"Band", s:"පටිය (Band)", p:"bænd", ex:"Rubber band", es:"රබර් පටියක්"},
+    {e:"Tape", s:"ටේප් එක", p:"teɪp", ex:"Sticky tape", es:"ඇලවෙන ටේප් එකක්"},
+    {e:"Stick", s:"කෝටුව", p:"stɪk", ex:"Walking stick", es:"ඇවිදින කෝටුවක්"},
+    {e:"Card", s:"කාඩ්පත", p:"kɑːd", ex:"Credit card", es:"ක්‍රෙඩිට් කාඩ් එක"},
+    {e:"Toy", s:"සෙල්ලම් බඩුව", p:"tɔɪ", ex:"Baby toy", es:"බබාගේ සෙල්ලම් බඩුවක්"},
+
+    // DAY 100: අවසාන ජයග්‍රහණය! (Final Milestone)
+    {e:"Victory", s:"ජයග්‍රහණය", p:"ˈvɪktəri", ex:"Big victory", es:"ලොකු ජයග්‍රහණයක්"},
+    {e:"Winner", s:"ජයග්‍රාහකයා", p:"ˈwɪnə", ex:"You are winner", es:"ඔයා තමයි දිනුම් (ජයග්‍රාහකයා)"},
+    {e:"Dream", s:"සිහිනය", p:"driːm", ex:"Big dream", es:"ලොකු හීනයක්"},
+    {e:"Goal", s:"ඉලක්කය", p:"gəʊl", ex:"Life goal", es:"ජීවිතයේ ඉලක්කය"},
+    {e:"Hero", s:"වීරයා", p:"ˈhɪərəʊ", ex:"Super hero", es:"සුපිරි වීරයෙක්"},
+    {e:"Freedom", s:"නිදහස", p:"ˈfriːdəm", ex:"Freedom fighter", es:"නිදහස් සටන්කරුවෙක්"},
+    {e:"Wisdom", s:"ප්‍රඥාව", p:"ˈwɪzdəm", ex:"Old wisdom", es:"පැරණි ප්‍රඥාව"},
+    {e:"Friendship", s:"මිතුරුකම", p:"ˈfrɛndʃɪp", ex:"True friendship", es:"සැබෑ මිත්‍රත්වය"},
+    {e:"Happiness", s:"සතුට", p:"ˈhæpɪnɪs", ex:"Find happiness", es:"සතුට සොයාගන්න"},
+    {e:"Prince", s:"කුමාරයා", p:"prɪns", ex:"Handsome prince", es:"කඩවසම් කුමාරයෙක්"}
+);
+
+</script>
+</body>
+</html>
