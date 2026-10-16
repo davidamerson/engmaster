@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public final class YouTubeRepository {
     public interface Callback {
@@ -36,21 +37,43 @@ public final class YouTubeRepository {
 
     public void refresh(Callback cb) {
         pool.execute(() -> {
+            ExecutorService channelPool = null;
             try {
-                List<VideoItem> all = new ArrayList<>();
                 List<ChannelSpec> channels = prefs.allEnabledChannels();
-                for (ChannelSpec c : channels) {
-                    try {
-                        String uploads = uploadsPlaylist(c);
-                        if (uploads != null && !uploads.isEmpty()) all.addAll(playlistVideos(c, uploads));
-                    } catch (Exception ignored) {}
+                if (channels.isEmpty()) {
+                    prefs.saveVideos(new ArrayList<>());
+                    cb.onSuccess(new ArrayList<>());
+                    return;
                 }
+
+                int workers = Math.min(6, Math.max(1, channels.size()));
+                channelPool = Executors.newFixedThreadPool(workers);
+                List<Future<List<VideoItem>>> futures = new ArrayList<>();
+                for (ChannelSpec c : channels) {
+                    futures.add(channelPool.submit(() -> {
+                        try {
+                            String uploads = uploadsPlaylist(c);
+                            if (uploads == null || uploads.isEmpty()) return new ArrayList<>();
+                            return playlistVideos(c, uploads);
+                        } catch (Exception ignored) {
+                            return new ArrayList<>();
+                        }
+                    }));
+                }
+
+                List<VideoItem> all = new ArrayList<>();
+                for (Future<List<VideoItem>> f : futures) {
+                    try { all.addAll(f.get()); } catch (Exception ignored) {}
+                }
+
                 Collections.sort(all, (a, b) -> b.publishedAt.compareTo(a.publishedAt));
                 if (all.size() > 320) all = new ArrayList<>(all.subList(0, 320));
                 prefs.saveVideos(all);
                 cb.onSuccess(all);
             } catch (Exception e) {
                 cb.onError(e.getMessage() == null ? "Could not load videos." : e.getMessage());
+            } finally {
+                if (channelPool != null) channelPool.shutdownNow();
             }
         });
     }
@@ -75,8 +98,6 @@ public final class YouTubeRepository {
     }
 
     private List<VideoItem> playlistVideos(ChannelSpec c, String playlist) throws Exception {
-        // Pull a deeper slice than before because live streams, age-restricted items,
-        // or videos YouTube refuses to embed are intentionally removed below.
         String url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=35&playlistId="
                 + enc(playlist) + "&key=" + enc(prefs.apiKey());
         JSONObject o = get(url);
@@ -95,10 +116,6 @@ public final class YouTubeRepository {
         }
         if (ids.isEmpty()) return new ArrayList<>();
 
-        // status.embeddable is useful but not a guarantee: YouTube documents that
-        // platform policy and third-party claims can still reject playback later.
-        // snippet.liveBroadcastContent and age rating let us proactively avoid two
-        // common classes of child-unfriendly / embed-problematic items.
         String vu = "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,status&id="
                 + enc(String.join(",", ids)) + "&key=" + enc(prefs.apiKey());
         JSONObject vo = get(vu);
@@ -160,7 +177,9 @@ public final class YouTubeRepository {
 
     private String bestThumbnail(JSONObject th) {
         if (th == null) return "";
-        String[] order = {"maxres", "standard", "high", "medium", "default"};
+        // High/medium are sharp enough for TV cards while avoiding hundreds of
+        // max-resolution images that made the old home screen slow and memory-heavy.
+        String[] order = {"high", "medium", "standard", "maxres", "default"};
         for (String key : order) {
             JSONObject q = th.optJSONObject(key);
             if (q != null) {
@@ -182,8 +201,8 @@ public final class YouTubeRepository {
 
     private JSONObject get(String u) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(u).openConnection();
-        c.setConnectTimeout(12000);
-        c.setReadTimeout(15000);
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(10000);
         c.setRequestProperty("Accept", "application/json");
         int code = c.getResponseCode();
         InputStream in = code >= 200 && code < 300 ? c.getInputStream() : c.getErrorStream();
