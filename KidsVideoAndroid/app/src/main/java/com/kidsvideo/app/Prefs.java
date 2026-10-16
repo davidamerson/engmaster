@@ -107,7 +107,6 @@ public final class Prefs {
 
     // YouTube can report a video as embeddable in the Data API and still reject
     // actual embedded playback later because of platform policy or rights claims.
-    // Remember those device-observed failures so children do not repeatedly hit them.
     public Set<String> playbackRejectedVideos() {
         return new HashSet<>(p.getStringSet("playback_rejected_ids", new HashSet<>()));
     }
@@ -127,6 +126,21 @@ public final class Prefs {
     public void clearPlaybackRejectedVideos() {
         p.edit().remove("playback_rejected_ids").apply();
         clearCache();
+    }
+
+    // Player v1.4 fixes the WebView identity/Referer implementation. Any IDs that
+    // older builds rejected may have been false negatives caused by our old origin,
+    // so clear them exactly once whenever the player integration revision changes.
+    public void migratePlayerRevision(String revision) {
+        String old = p.getString("player_revision", "");
+        if (!revision.equals(old)) {
+            p.edit()
+                    .putString("player_revision", revision)
+                    .remove("playback_rejected_ids")
+                    .remove("video_cache")
+                    .remove("cache_time")
+                    .apply();
+        }
     }
 
     public void saveVideos(List<VideoItem> videos) {
