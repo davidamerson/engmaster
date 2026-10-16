@@ -97,12 +97,12 @@ public class PlayerActivity extends Activity {
     private void loadPlayer(boolean privacyHost) {
         if (videoId == null || videoId.trim().isEmpty()) return;
         String host = privacyHost ? "www.youtube-nocookie.com" : "www.youtube.com";
-        String referrer = "https://" + getPackageName().toLowerCase() + "/";
-        String encodedReferrer = Uri.encode(referrer);
+        String appOrigin = "https://" + getPackageName().toLowerCase();
+        String referrer = appOrigin + "/";
         String url = "https://" + host + "/embed/" + Uri.encode(videoId)
                 + "?autoplay=1&playsinline=1&rel=0&enablejsapi=1"
-                + "&origin=" + encodedReferrer
-                + "&widget_referrer=" + encodedReferrer;
+                + "&origin=" + Uri.encode(appOrigin)
+                + "&widget_referrer=" + Uri.encode(referrer);
 
         Map<String, String> headers = new HashMap<>();
         // YouTube requires an HTTP Referer (or equivalent client identity) for
