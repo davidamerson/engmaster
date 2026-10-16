@@ -29,6 +29,9 @@ jobs:
         with:
           gradle-version: '8.9'
 
+      - name: Prepare stable family test signing key
+        run: base64 --decode KidsVideoAndroid/app/kids-test.keystore.b64 > KidsVideoAndroid/app/kids-test.keystore
+
       - name: Build daughter and son debug APKs
         working-directory: KidsVideoAndroid
         run: gradle --no-daemon clean assembleDaughterDebug assembleSonDebug
