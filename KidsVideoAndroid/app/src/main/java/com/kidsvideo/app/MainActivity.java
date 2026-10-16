@@ -23,6 +23,7 @@ import java.util.Set;
 
 public class MainActivity extends Activity {
     private static final long REFRESH_INTERVAL_MS = 4L * 60L * 60L * 1000L;
+    private static final int BATCH_SIZE = 24;
 
     private Prefs prefs;
     private YouTubeRepository repo;
@@ -31,9 +32,13 @@ public class MainActivity extends Activity {
     private LinearLayout cats;
     private EditText search;
     private TextView status;
+    private ScrollView sc;
     private List<VideoItem> videos = new ArrayList<>();
+    private List<VideoItem> filtered = new ArrayList<>();
     private String category = "Home";
     private boolean loading = false;
+    private boolean appending = false;
+    private int renderedCount = 0;
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
@@ -77,8 +82,7 @@ public class MainActivity extends Activity {
             LinearLayout top = new LinearLayout(this);
             top.setGravity(Gravity.CENTER_VERTICAL);
             top.setPadding(Ui.dp(this, 16), Ui.dp(this, 10), Ui.dp(this, 16), Ui.dp(this, 8));
-            TextView logo = makeLogo();
-            top.addView(logo, new LinearLayout.LayoutParams(0, -2, 1));
+            top.addView(makeLogo(), new LinearLayout.LayoutParams(0, -2, 1));
             search = makeSearch();
             int searchWidth = Ui.isTv(this) ? Ui.dp(this, 440) : Ui.dp(this, 360);
             top.addView(search, new LinearLayout.LayoutParams(searchWidth, Ui.dp(this, 48)));
@@ -114,13 +118,21 @@ public class MainActivity extends Activity {
         status.setPadding(Ui.dp(this, 18), Ui.dp(this, 6), Ui.dp(this, 18), Ui.dp(this, 6));
         root.addView(status);
 
-        ScrollView sc = new ScrollView(this);
+        sc = new ScrollView(this);
+        sc.setFillViewport(true);
         list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         int side = Ui.isTv(this) ? 28 : 12;
         list.setPadding(Ui.dp(this, side), 0, Ui.dp(this, side), Ui.dp(this, 30));
         sc.addView(list);
         root.addView(sc, new LinearLayout.LayoutParams(-1, 0, 1));
+
+        sc.setOnScrollChangeListener((v, sx, sy, ox, oy) -> {
+            View child = sc.getChildAt(0);
+            if (child == null || appending) return;
+            int remaining = child.getMeasuredHeight() - (sc.getHeight() + sy);
+            if (remaining < Ui.dp(this, 900)) appendNextBatch();
+        });
 
         search.setOnEditorActionListener((v, a, e) -> {
             render();
@@ -215,7 +227,7 @@ public class MainActivity extends Activity {
         }
 
         loading = true;
-        status.setText(cache.isEmpty() ? "Loading approved channels…" : "Refreshing approved channels…");
+        status.setText(cache.isEmpty() ? "Loading approved channels…" : "Refreshing approved channels in background…");
         repo.refresh(new YouTubeRepository.Callback() {
             public void onSuccess(List<VideoItem> v) {
                 runOnUiThread(() -> {
@@ -235,43 +247,39 @@ public class MainActivity extends Activity {
         });
     }
 
+    private boolean matchesSection(VideoItem v, Set<String> fav, List<String> hist) {
+        return category.equals("Home")
+                || category.equals(v.category)
+                || (category.equals("Favourites") && fav.contains(v.id))
+                || (category.equals("Watched") && hist.contains(v.id));
+    }
+
     private void renderStatusForCurrentCategory() {
         if (status == null) return;
-        int count = 0;
-        Set<String> fav = prefs.favorites();
-        List<String> hist = prefs.history();
-        for (VideoItem v : videos) {
-            if (prefs.isPlaybackRejected(v.id)) continue;
-            boolean ok = category.equals("Home")
-                    || category.equals(v.category)
-                    || (category.equals("Favourites") && fav.contains(v.id))
-                    || (category.equals("Watched") && hist.contains(v.id));
-            if (ok) count++;
-        }
-        status.setText("Selected: " + category + "   •   " + count + " approved long videos");
+        status.setText("Selected: " + category + "   •   " + filtered.size() + " approved long videos");
     }
 
     private void render() {
         if (list == null || search == null) return;
         list.removeAllViews();
+        filtered.clear();
+        renderedCount = 0;
+        if (sc != null) sc.scrollTo(0, 0);
+
         String q = search.getText().toString().trim().toLowerCase(Locale.ROOT);
         Set<String> fav = prefs.favorites();
         List<String> hist = prefs.history();
-        int shown = 0;
+
         for (VideoItem v : videos) {
             if (prefs.isPlaybackRejected(v.id)) continue;
-            boolean ok = category.equals("Home")
-                    || category.equals(v.category)
-                    || (category.equals("Favourites") && fav.contains(v.id))
-                    || (category.equals("Watched") && hist.contains(v.id));
-            if (!ok) continue;
+            if (!matchesSection(v, fav, hist)) continue;
             if (!q.isEmpty() && !(v.title.toLowerCase(Locale.ROOT).contains(q)
                     || v.channelTitle.toLowerCase(Locale.ROOT).contains(q)
                     || v.category.toLowerCase(Locale.ROOT).contains(q))) continue;
-            list.addView(card(v));
-            shown++;
+            filtered.add(v);
         }
-        if (shown == 0) {
+
+        if (filtered.isEmpty()) {
             TextView e = new TextView(this);
             e.setText(q.isEmpty()
                     ? "No playable approved videos in this section yet."
@@ -280,10 +288,25 @@ public class MainActivity extends Activity {
             e.setTextSize(Ui.isTv(this) ? 21 : 18);
             e.setPadding(Ui.dp(this, 22), Ui.dp(this, 30), Ui.dp(this, 22), Ui.dp(this, 30));
             list.addView(e);
+        } else {
+            appendNextBatch();
         }
-        if (!loading) {
-            status.setText("Selected: " + category + "   •   " + shown + " shown   •   " + videos.size() + " playable candidates");
-        }
+        updateStatus();
+    }
+
+    private void appendNextBatch() {
+        if (appending || renderedCount >= filtered.size()) return;
+        appending = true;
+        int end = Math.min(filtered.size(), renderedCount + BATCH_SIZE);
+        for (int i = renderedCount; i < end; i++) list.addView(card(filtered.get(i)));
+        renderedCount = end;
+        appending = false;
+        updateStatus();
+    }
+
+    private void updateStatus() {
+        if (status == null || loading) return;
+        status.setText("Selected: " + category + "   •   " + renderedCount + "/" + filtered.size() + " shown");
     }
 
     private View card(VideoItem v) {
@@ -302,11 +325,8 @@ public class MainActivity extends Activity {
         im.setAdjustViewBounds(false);
         int thumbWdp = Ui.thumbnailWidthDp(this);
         int thumbHdp = Math.round(thumbWdp * 9f / 16f);
-        if (horizontal) {
-            row.addView(im, new LinearLayout.LayoutParams(Ui.dp(this, thumbWdp), Ui.dp(this, thumbHdp)));
-        } else {
-            row.addView(im, new LinearLayout.LayoutParams(-1, Ui.dp(this, thumbHdp)));
-        }
+        if (horizontal) row.addView(im, new LinearLayout.LayoutParams(Ui.dp(this, thumbWdp), Ui.dp(this, thumbHdp)));
+        else row.addView(im, new LinearLayout.LayoutParams(-1, Ui.dp(this, thumbHdp)));
         ThumbnailLoader.load(im, v.thumbnailUrl);
 
         LinearLayout meta = new LinearLayout(this);
@@ -333,7 +353,8 @@ public class MainActivity extends Activity {
         fav.setAllCaps(false);
         fav.setOnClickListener(x -> {
             prefs.toggleFavorite(v.id);
-            render();
+            fav.setText(prefs.isFavorite(v.id) ? "★ Favourite" : "☆ Favourite");
+            if (category.equals("Favourites")) render();
         });
         meta.addView(fav, new LinearLayout.LayoutParams(-2, -2));
 
@@ -368,6 +389,7 @@ public class MainActivity extends Activity {
         Intent i = new Intent(this, PlayerActivity.class);
         i.putExtra("id", v.id);
         i.putExtra("title", v.title);
+        i.putExtra("channelTitle", v.channelTitle);
         startActivity(i);
     }
 
@@ -377,14 +399,10 @@ public class MainActivity extends Activity {
             public void onResult(String t) {
                 runOnUiThread(() -> {
                     search.setText(t);
-                    status.setText("You said: " + t);
                     render();
                 });
             }
-
-            public void onError(String m) {
-                runOnUiThread(() -> status.setText(m));
-            }
+            public void onError(String m) { runOnUiThread(() -> status.setText(m)); }
         });
     }
 
