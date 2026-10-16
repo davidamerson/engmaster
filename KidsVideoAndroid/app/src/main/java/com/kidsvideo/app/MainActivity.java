@@ -53,6 +53,8 @@ public class MainActivity extends Activity {
         if (prefs != null && !prefs.apiKey().isEmpty() && !loading
                 && (videos.isEmpty() || prefs.cacheTime() == 0)) {
             load();
+        } else if (list != null && !videos.isEmpty()) {
+            render();
         }
     }
 
@@ -161,13 +163,23 @@ public class MainActivity extends Activity {
             x.setText(c);
             x.setTextSize(Ui.isTv(this) ? 17 : 15);
             x.setFocusable(true);
-            Ui.styleButton(x, c.equals(category));
+            x.setClickable(true);
+            Ui.styleCategory(x, c.equals(category), false);
             x.setOnClickListener(v -> {
                 category = c;
                 rebuildCategories();
                 render();
             });
-            x.setOnFocusChangeListener((v, focused) -> Ui.focusScale(v, focused));
+            x.setOnFocusChangeListener((v, focused) -> {
+                TextView chip = (TextView) v;
+                boolean selected = chip.getText().toString().equals(category);
+                Ui.styleCategory(chip, selected, focused);
+                if (focused && status != null) {
+                    status.setText("Move: " + chip.getText() + "   •   Press OK to select");
+                } else if (!loading && status != null) {
+                    renderStatusForCurrentCategory();
+                }
+            });
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
             lp.setMargins(Ui.dp(this, 4), 0, Ui.dp(this, 4), 0);
             cats.addView(x, lp);
@@ -177,7 +189,8 @@ public class MainActivity extends Activity {
     private void rebuildCategories() {
         for (int i = 0; i < cats.getChildCount(); i++) {
             TextView v = (TextView) cats.getChildAt(i);
-            Ui.styleButton(v, v.getText().toString().equals(category));
+            boolean selected = v.getText().toString().equals(category);
+            Ui.styleCategory(v, selected, v.hasFocus());
         }
     }
 
@@ -186,7 +199,6 @@ public class MainActivity extends Activity {
         List<VideoItem> cache = prefs.loadVideos();
         if (!cache.isEmpty()) {
             videos = cache;
-            status.setText(cache.size() + " approved long videos");
             render();
             long age = System.currentTimeMillis() - prefs.cacheTime();
             if (age >= 0 && age < REFRESH_INTERVAL_MS) return;
@@ -199,7 +211,6 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     loading = false;
                     videos = v;
-                    status.setText(v.size() + " approved long videos");
                     render();
                 });
             }
@@ -211,6 +222,21 @@ public class MainActivity extends Activity {
                 });
             }
         });
+    }
+
+    private void renderStatusForCurrentCategory() {
+        if (status == null) return;
+        int count = 0;
+        Set<String> fav = prefs.favorites();
+        List<String> hist = prefs.history();
+        for (VideoItem v : videos) {
+            boolean ok = category.equals("Home")
+                    || category.equals(v.category)
+                    || (category.equals("Favourites") && fav.contains(v.id))
+                    || (category.equals("Watched") && hist.contains(v.id));
+            if (ok) count++;
+        }
+        status.setText("Selected: " + category + "   •   " + count + " approved long videos");
     }
 
     private void render() {
@@ -241,6 +267,9 @@ public class MainActivity extends Activity {
             e.setTextSize(Ui.isTv(this) ? 21 : 18);
             e.setPadding(Ui.dp(this, 22), Ui.dp(this, 30), Ui.dp(this, 22), Ui.dp(this, 30));
             list.addView(e);
+        }
+        if (!loading) {
+            status.setText("Selected: " + category + "   •   " + shown + " shown   •   " + videos.size() + " total approved");
         }
     }
 
@@ -316,7 +345,13 @@ public class MainActivity extends Activity {
                     .show();
             return;
         }
+
         prefs.addHistory(v.id);
+        if (prefs.useOfficialYouTubePlayer()) {
+            if (ExternalPlayback.openOfficialYouTube(this, v.id)) return;
+            Toast.makeText(this, "Official YouTube could not open. Using the in-app player.", Toast.LENGTH_LONG).show();
+        }
+
         Intent i = new Intent(this, PlayerActivity.class);
         i.putExtra("id", v.id);
         i.putExtra("title", v.title);
