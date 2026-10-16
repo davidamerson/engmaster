@@ -31,8 +31,6 @@ public final class Prefs {
     public void setVoiceLocale(String v) { p.edit().putString("voice_locale", v).apply(); }
     public String blockedKeywords() { return p.getString("blocked_keywords", AppConfig.defaultBlockedKeywords()); }
     public void setBlockedKeywords(String v) { p.edit().putString("blocked_keywords", v == null ? "" : v).apply(); }
-    public boolean useOfficialYouTubePlayer() { return p.getBoolean("official_youtube_player", false); }
-    public void setUseOfficialYouTubePlayer(boolean v) { p.edit().putBoolean("official_youtube_player", v).apply(); }
 
     public Set<String> disabledHandles() {
         return new HashSet<>(p.getStringSet("disabled_handles", new HashSet<>()));
@@ -107,9 +105,35 @@ public final class Prefs {
         return new ArrayList<>(result.values());
     }
 
+    // YouTube can report a video as embeddable in the Data API and still reject
+    // actual embedded playback later because of platform policy or rights claims.
+    // Remember those device-observed failures so children do not repeatedly hit them.
+    public Set<String> playbackRejectedVideos() {
+        return new HashSet<>(p.getStringSet("playback_rejected_ids", new HashSet<>()));
+    }
+
+    public boolean isPlaybackRejected(String id) {
+        return id != null && playbackRejectedVideos().contains(id);
+    }
+
+    public void markPlaybackRejected(String id) {
+        if (id == null || id.trim().isEmpty()) return;
+        Set<String> s = playbackRejectedVideos();
+        s.add(id.trim());
+        p.edit().putStringSet("playback_rejected_ids", s).apply();
+        clearCache();
+    }
+
+    public void clearPlaybackRejectedVideos() {
+        p.edit().remove("playback_rejected_ids").apply();
+        clearCache();
+    }
+
     public void saveVideos(List<VideoItem> videos) {
         JSONArray a = new JSONArray();
+        Set<String> rejected = playbackRejectedVideos();
         for (VideoItem v : videos) {
+            if (rejected.contains(v.id)) continue;
             try { a.put(v.toJson()); } catch (Exception ignored) {}
         }
         p.edit().putString("video_cache", a.toString()).putLong("cache_time", System.currentTimeMillis()).apply();
@@ -117,9 +141,13 @@ public final class Prefs {
 
     public List<VideoItem> loadVideos() {
         List<VideoItem> out = new ArrayList<>();
+        Set<String> rejected = playbackRejectedVideos();
         try {
             JSONArray a = new JSONArray(p.getString("video_cache", "[]"));
-            for (int i = 0; i < a.length(); i++) out.add(VideoItem.fromJson(a.getJSONObject(i)));
+            for (int i = 0; i < a.length(); i++) {
+                VideoItem v = VideoItem.fromJson(a.getJSONObject(i));
+                if (!rejected.contains(v.id)) out.add(v);
+            }
         } catch (Exception ignored) {}
         return out;
     }
