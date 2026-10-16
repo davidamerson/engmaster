@@ -50,12 +50,21 @@ public class MainActivity extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (prefs != null) removeRejectedFromMemory();
         if (prefs != null && !prefs.apiKey().isEmpty() && !loading
                 && (videos.isEmpty() || prefs.cacheTime() == 0)) {
             load();
         } else if (list != null && !videos.isEmpty()) {
             render();
         }
+    }
+
+    private void removeRejectedFromMemory() {
+        Set<String> rejected = prefs.playbackRejectedVideos();
+        if (rejected.isEmpty() || videos.isEmpty()) return;
+        List<VideoItem> keep = new ArrayList<>();
+        for (VideoItem v : videos) if (!rejected.contains(v.id)) keep.add(v);
+        videos = keep;
     }
 
     private void build() {
@@ -199,6 +208,7 @@ public class MainActivity extends Activity {
         List<VideoItem> cache = prefs.loadVideos();
         if (!cache.isEmpty()) {
             videos = cache;
+            removeRejectedFromMemory();
             render();
             long age = System.currentTimeMillis() - prefs.cacheTime();
             if (age >= 0 && age < REFRESH_INTERVAL_MS) return;
@@ -211,6 +221,7 @@ public class MainActivity extends Activity {
                 runOnUiThread(() -> {
                     loading = false;
                     videos = v;
+                    removeRejectedFromMemory();
                     render();
                 });
             }
@@ -230,6 +241,7 @@ public class MainActivity extends Activity {
         Set<String> fav = prefs.favorites();
         List<String> hist = prefs.history();
         for (VideoItem v : videos) {
+            if (prefs.isPlaybackRejected(v.id)) continue;
             boolean ok = category.equals("Home")
                     || category.equals(v.category)
                     || (category.equals("Favourites") && fav.contains(v.id))
@@ -247,6 +259,7 @@ public class MainActivity extends Activity {
         List<String> hist = prefs.history();
         int shown = 0;
         for (VideoItem v : videos) {
+            if (prefs.isPlaybackRejected(v.id)) continue;
             boolean ok = category.equals("Home")
                     || category.equals(v.category)
                     || (category.equals("Favourites") && fav.contains(v.id))
@@ -261,7 +274,7 @@ public class MainActivity extends Activity {
         if (shown == 0) {
             TextView e = new TextView(this);
             e.setText(q.isEmpty()
-                    ? "No videos in this section yet."
+                    ? "No playable approved videos in this section yet."
                     : "No approved videos match ‘" + q + "’. " + AppConfig.searchSuggestion());
             e.setTextColor(Color.LTGRAY);
             e.setTextSize(Ui.isTv(this) ? 21 : 18);
@@ -269,7 +282,7 @@ public class MainActivity extends Activity {
             list.addView(e);
         }
         if (!loading) {
-            status.setText("Selected: " + category + "   •   " + shown + " shown   •   " + videos.size() + " total approved");
+            status.setText("Selected: " + category + "   •   " + shown + " shown   •   " + videos.size() + " playable candidates");
         }
     }
 
@@ -336,6 +349,11 @@ public class MainActivity extends Activity {
     }
 
     private void open(VideoItem v) {
+        if (prefs.isPlaybackRejected(v.id)) {
+            removeRejectedFromMemory();
+            render();
+            return;
+        }
         TimeLimit t = new TimeLimit(this);
         if (!t.canWatch()) {
             new AlertDialog.Builder(this)
@@ -347,11 +365,6 @@ public class MainActivity extends Activity {
         }
 
         prefs.addHistory(v.id);
-        if (prefs.useOfficialYouTubePlayer()) {
-            if (ExternalPlayback.openOfficialYouTube(this, v.id)) return;
-            Toast.makeText(this, "Official YouTube could not open. Using the in-app player.", Toast.LENGTH_LONG).show();
-        }
-
         Intent i = new Intent(this, PlayerActivity.class);
         i.putExtra("id", v.id);
         i.putExtra("title", v.title);
