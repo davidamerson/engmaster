@@ -60,6 +60,18 @@ public class ParentSettingsActivity extends Activity {
         limit.setInputType(InputType.TYPE_CLASS_NUMBER);
         root.addView(limit);
 
+        root.addView(sectionTitle("Playback"));
+        CheckBox official = new CheckBox(this);
+        official.setText("Use the official YouTube app for playback on this device");
+        official.setTextColor(Color.WHITE);
+        official.setChecked(prefs.useOfficialYouTubePlayer());
+        root.addView(official);
+        TextView playbackNote = label(
+                "Leave this OFF for the locked-down in-app player. If YouTube shows ‘Sign in to confirm you’re not a bot’ in the in-app player on this TV/tablet, turn this ON after signing in to the official YouTube app. This is the most reliable playback fallback, but once the official YouTube app opens it can show its own interface and recommendations.",
+                14);
+        playbackNote.setTextColor(Color.LTGRAY);
+        root.addView(playbackNote);
+
         root.addView(sectionTitle("Speaking & conversation"));
         Spinner voice = new Spinner(this);
         ArrayAdapter<String> voiceAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item,
@@ -90,7 +102,7 @@ public class ParentSettingsActivity extends Activity {
         TextView channelNote = label(
                 AppConfig.isDaughter()
                         ? "Untick any built-in channel you do not want in this app."
-                        : "The son's app now includes every built-in channel from his sister's app as well as his older-child channels. Untick any channel you want to remove.",
+                        : "The son's app includes every built-in channel from his sister's app as well as his older-child channels. Untick any channel you want to remove.",
                 14);
         channelNote.setTextColor(Color.LTGRAY);
         root.addView(channelNote);
@@ -117,7 +129,7 @@ public class ParentSettingsActivity extends Activity {
 
         root.addView(sectionTitle("Add your own approved channel"));
         TextView addNote = label(
-                "Paste an @handle, a youtube.com/@handle URL, or a YouTube channel ID. Only videos from channels you add here are included; normal YouTube search is still not exposed to the child.",
+                "Paste an @handle, a youtube.com/@handle URL, or a YouTube channel ID. Only videos from channels you add here are included in our catalogue; normal YouTube search is still not exposed inside the child app.",
                 14);
         addNote.setTextColor(Color.LTGRAY);
         root.addView(addNote);
@@ -153,6 +165,7 @@ public class ParentSettingsActivity extends Activity {
             prefs.setParentPin(pin.getText().toString());
             try { prefs.setMinVideoMinutes(Integer.parseInt(min.getText().toString())); } catch (Exception ignored) {}
             try { prefs.setDailyLimitMinutes(Integer.parseInt(limit.getText().toString())); } catch (Exception ignored) {}
+            prefs.setUseOfficialYouTubePlayer(official.isChecked());
             prefs.setVoiceLocale(voice.getSelectedItemPosition() == 1 ? "en-US" : "en-GB");
             prefs.setAutoConversation(convo.isChecked());
             prefs.setBlockedKeywords(blocked.getText().toString());
