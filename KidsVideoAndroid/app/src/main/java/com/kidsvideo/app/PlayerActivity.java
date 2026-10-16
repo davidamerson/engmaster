@@ -3,7 +3,6 @@ package com.kidsvideo.app;
 import android.app.AlertDialog;
 import android.app.Activity;
 import android.graphics.Color;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -11,9 +10,9 @@ import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -21,13 +20,11 @@ import android.widget.Toast;
 import java.util.List;
 
 import androidx.webkit.WebSettingsCompat;
-import androidx.webkit.WebViewAssetLoader;
-import androidx.webkit.WebViewClientCompat;
 import androidx.webkit.WebViewFeature;
 import androidx.webkit.WebViewMediaIntegrityApiStatusConfig;
 
 public class PlayerActivity extends Activity {
-    private static final String APP_ASSET_ORIGIN = "https://appassets.androidplatform.net";
+    private static final String PLAYER_REVISION = "v14-appid-referrer";
 
     private Prefs prefs;
     private WebView web;
@@ -40,18 +37,24 @@ public class PlayerActivity extends Activity {
     private int qIndex = 0;
     private TextView playerStatus;
     private TextView titleView;
-    private WebViewAssetLoader assetLoader;
     private boolean rejectionHandled = false;
+    private String appOrigin;
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
         prefs = new Prefs(this);
+        prefs.migratePlayerRevision(PLAYER_REVISION);
         speech = new SpeechHelper(this);
         speaker = new EnglishSpeaker(this, prefs.voiceLocale());
         limit = new TimeLimit(this);
         videoId = getIntent().getStringExtra("id");
         title = getIntent().getStringExtra("title");
         channelTitle = getIntent().getStringExtra("channelTitle");
+
+        // YouTube's current Android WebView requirements say the Referer domain
+        // should be the installed app ID. The product flavors resolve to e.g.
+        // com.kidsvideo.app.son and com.kidsvideo.app.daughter at runtime.
+        appOrigin = "https://" + getPackageName();
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -75,10 +78,6 @@ public class PlayerActivity extends Activity {
     }
 
     private void configureWebView() {
-        assetLoader = new WebViewAssetLoader.Builder()
-                .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
-                .build();
-
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
@@ -92,6 +91,8 @@ public class PlayerActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) s.setSafeBrowsingEnabled(true);
 
+        // YouTube can use WebView Media Integrity to attest the package/version/
+        // signing certificate of the embedding Android app.
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEBVIEW_MEDIA_INTEGRITY_API_STATUS)) {
             try {
                 WebViewMediaIntegrityApiStatusConfig config =
@@ -112,34 +113,59 @@ public class PlayerActivity extends Activity {
         web.setFocusable(true);
         web.setFocusableInTouchMode(true);
         web.addJavascriptInterface(new PlayerBridge(), "AndroidPlayer");
-        web.setWebViewClient(new WebViewClientCompat() {
-            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                WebResourceResponse response = assetLoader.shouldInterceptRequest(request.getUrl());
-                return response != null ? response : super.shouldInterceptRequest(view, request);
-            }
-
-            @Override @SuppressWarnings("deprecation")
-            public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
-                WebResourceResponse response = assetLoader.shouldInterceptRequest(Uri.parse(url));
-                return response != null ? response : super.shouldInterceptRequest(view, url);
-            }
-
+        web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
                 String u = request.getUrl().toString();
-                return !u.startsWith(APP_ASSET_ORIGIN + "/assets/");
+                // Keep the child inside our player document. YouTube content is only
+                // allowed in the iframe, never as unrestricted top-level browsing.
+                return !(u.startsWith(appOrigin) || u.equals("about:blank"));
             }
         });
+    }
+
+    private String jsEscape(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("'", "\\'").replace("\r", "").replace("\n", "");
+    }
+
+    private String buildPlayerHtml() {
+        String id = jsEscape(videoId);
+        String origin = jsEscape(appOrigin);
+        return "<!doctype html><html><head>"
+                + "<meta charset='utf-8'>"
+                + "<meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'>"
+                + "<meta name='referrer' content='strict-origin-when-cross-origin'>"
+                + "<style>html,body,#player{width:100%;height:100%;margin:0;padding:0;background:#000;overflow:hidden}iframe{width:100%!important;height:100%!important}</style>"
+                + "</head><body><div id='player'></div><script>"
+                + "(function(){"
+                + "var videoId='" + id + "';"
+                + "var appOrigin='" + origin + "';"
+                + "function send(n,v){try{if(window.AndroidPlayer&&typeof window.AndroidPlayer[n]==='function'){window.AndroidPlayer[n](String(v==null?'':v));}}catch(e){}}"
+                + "window.onYouTubeIframeAPIReady=function(){"
+                + "new YT.Player('player',{width:'100%',height:'100%',videoId:videoId,host:'https://www.youtube.com',"
+                + "playerVars:{autoplay:1,playsinline:1,rel:0,controls:1,fs:1,origin:appOrigin,widget_referrer:appOrigin},"
+                + "events:{onReady:function(e){send('onReady',videoId);try{e.target.playVideo();}catch(x){}},"
+                + "onStateChange:function(e){send('onState',e.data);},"
+                + "onError:function(e){send('onError',e.data);},"
+                + "onAutoplayBlocked:function(){send('onAutoplayBlocked','1');}}});};"
+                + "var tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';tag.async=true;"
+                + "tag.onerror=function(){send('onError','network');};document.head.appendChild(tag);"
+                + "})();</script></body></html>";
     }
 
     private void loadPlayer() {
         if (videoId == null || videoId.trim().isEmpty()) return;
         rejectionHandled = false;
-        playerStatus.setText("Loading secure in-app YouTube player…");
+        playerStatus.setText("Loading in-app YouTube player…");
         if (titleView != null) titleView.setText(title == null ? "" : title);
-        String url = APP_ASSET_ORIGIN + "/assets/player.html?video=" + Uri.encode(videoId);
         web.stopLoading();
-        web.loadUrl(url);
+
+        // This is the important v1.4 change. YouTube's published Android guidance
+        // for a local HTML player is to use loadDataWithBaseURL(). Supplying the
+        // installed package ID as the HTTPS base URL makes WebView send that app ID
+        // as the HTTP Referer instead of appassets.androidplatform.net.
+        web.loadDataWithBaseURL(appOrigin + "/", buildPlayerHtml(), "text/html", "UTF-8", null);
     }
 
     private View buildControlArea() {
@@ -210,8 +236,6 @@ public class PlayerActivity extends Activity {
         if (rejectionHandled) return;
         rejectionHandled = true;
 
-        // Capture candidates before marking this ID, because marking deliberately
-        // invalidates the cached catalogue so the home screen refreshes later.
         List<VideoItem> candidates = prefs.loadVideos();
         String failedId = videoId;
         prefs.markPlaybackRejected(failedId);
@@ -238,20 +262,20 @@ public class PlayerActivity extends Activity {
 
         if (next != null) {
             VideoItem chosen = next;
-            playerStatus.setText("That video cannot play inside apps. Trying another approved video…");
-            Toast.makeText(this, "YouTube blocked that video from embedded playback. Trying another approved video.", Toast.LENGTH_LONG).show();
+            playerStatus.setText("That video is not allowed in embedded players. Trying another approved video…");
+            Toast.makeText(this, "Trying another approved video.", Toast.LENGTH_SHORT).show();
             web.postDelayed(() -> {
                 videoId = chosen.id;
                 title = chosen.title;
                 channelTitle = chosen.channelTitle;
                 prefs.addHistory(chosen.id);
                 loadPlayer();
-            }, 700);
+            }, 600);
         } else {
-            playerStatus.setText("This video cannot be played inside approved apps. It has been removed.");
+            playerStatus.setText("This video cannot be played inside an embedded player.");
             new AlertDialog.Builder(this)
-                    .setTitle("Video unavailable in embedded players")
-                    .setMessage("YouTube does not permit this particular video to play inside an embedded player (error " + code + "). It has been removed from this device. There are no other cached approved videos to switch to right now.")
+                    .setTitle("Video unavailable")
+                    .setMessage("YouTube does not allow this video in embedded players (error " + code + "). It has been removed from this device.")
                     .setCancelable(false)
                     .setPositiveButton("Back to videos", (d, w) -> finish())
                     .show();
@@ -260,7 +284,7 @@ public class PlayerActivity extends Activity {
 
     private final class PlayerBridge {
         @JavascriptInterface public void onReady(String ignored) {
-            runOnUiThread(() -> playerStatus.setText("YouTube player ready"));
+            runOnUiThread(() -> playerStatus.setText("YouTube player ready • " + getPackageName()));
         }
 
         @JavascriptInterface public void onState(String value) {
@@ -275,6 +299,9 @@ public class PlayerActivity extends Activity {
             runOnUiThread(() -> {
                 if ("101".equals(code) || "150".equals(code) || "100".equals(code)) {
                     handleUnembeddable(code);
+                } else if ("153".equals(code)) {
+                    playerStatus.setText("YouTube could not identify this app (error 153). App ID: " + getPackageName());
+                    Toast.makeText(PlayerActivity.this, "YouTube identification error 153", Toast.LENGTH_LONG).show();
                 } else {
                     playerStatus.setText("YouTube playback error " + code + ". Press Retry.");
                     Toast.makeText(PlayerActivity.this, "YouTube player error " + code, Toast.LENGTH_LONG).show();
