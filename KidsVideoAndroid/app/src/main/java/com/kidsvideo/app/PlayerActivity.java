@@ -18,6 +18,7 @@ import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import java.util.List;
 
 import androidx.webkit.WebSettingsCompat;
 import androidx.webkit.WebViewAssetLoader;
@@ -35,8 +36,10 @@ public class PlayerActivity extends Activity {
     private TimeLimit limit;
     private String title;
     private String videoId;
+    private String channelTitle;
     private int qIndex = 0;
     private TextView playerStatus;
+    private TextView titleView;
     private WebViewAssetLoader assetLoader;
     private boolean rejectionHandled = false;
 
@@ -48,6 +51,7 @@ public class PlayerActivity extends Activity {
         limit = new TimeLimit(this);
         videoId = getIntent().getStringExtra("id");
         title = getIntent().getStringExtra("title");
+        channelTitle = getIntent().getStringExtra("channelTitle");
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -123,8 +127,6 @@ public class PlayerActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
                 String u = request.getUrl().toString();
-                // The main frame never leaves our own HTTPS app page. Any YouTube
-                // sign-in/search/related navigation therefore cannot escape the whitelist.
                 return !u.startsWith(APP_ASSET_ORIGIN + "/assets/");
             }
         });
@@ -134,6 +136,7 @@ public class PlayerActivity extends Activity {
         if (videoId == null || videoId.trim().isEmpty()) return;
         rejectionHandled = false;
         playerStatus.setText("Loading secure in-app YouTube player…");
+        if (titleView != null) titleView.setText(title == null ? "" : title);
         String url = APP_ASSET_ORIGIN + "/assets/player.html?video=" + Uri.encode(videoId);
         web.stopLoading();
         web.loadUrl(url);
@@ -146,11 +149,11 @@ public class PlayerActivity extends Activity {
         outer.setPadding(Ui.dp(this, 8), Ui.dp(this, 4), Ui.dp(this, 8), Ui.dp(this, 6));
         outer.setBackgroundColor(Color.rgb(10, 10, 10));
 
-        TextView tt = new TextView(this);
-        tt.setText(title == null ? "" : title);
-        tt.setTextColor(Color.WHITE);
-        tt.setTextSize(Ui.isTv(this) ? 18 : 15);
-        tt.setMaxLines(wide ? 2 : 1);
+        titleView = new TextView(this);
+        titleView.setText(title == null ? "" : title);
+        titleView.setTextColor(Color.WHITE);
+        titleView.setTextSize(Ui.isTv(this) ? 18 : 15);
+        titleView.setMaxLines(wide ? 2 : 1);
 
         Button back = new Button(this);
         back.setText("← Back");
@@ -179,7 +182,7 @@ public class PlayerActivity extends Activity {
             LinearLayout titleRow = new LinearLayout(this);
             titleRow.setGravity(Gravity.CENTER_VERTICAL);
             titleRow.addView(back);
-            titleRow.addView(tt, new LinearLayout.LayoutParams(0, -2, 1));
+            titleRow.addView(titleView, new LinearLayout.LayoutParams(0, -2, 1));
             titleRow.addView(fav);
             outer.addView(titleRow);
 
@@ -189,7 +192,7 @@ public class PlayerActivity extends Activity {
             actionRow.addView(talk, new LinearLayout.LayoutParams(0, -2, 2));
             outer.addView(actionRow);
         } else {
-            outer.addView(tt, new LinearLayout.LayoutParams(-1, -2));
+            outer.addView(titleView, new LinearLayout.LayoutParams(-1, -2));
             LinearLayout row1 = new LinearLayout(this);
             row1.addView(back, new LinearLayout.LayoutParams(0, -2, 1));
             row1.addView(retry, new LinearLayout.LayoutParams(0, -2, 1));
@@ -206,14 +209,53 @@ public class PlayerActivity extends Activity {
     private void handleUnembeddable(String code) {
         if (rejectionHandled) return;
         rejectionHandled = true;
-        prefs.markPlaybackRejected(videoId);
-        playerStatus.setText("This video cannot be played inside approved apps. It has been removed from this device.");
-        new AlertDialog.Builder(this)
-                .setTitle("Video removed")
-                .setMessage("YouTube does not permit this particular video to play in an embedded player (error " + code + "). It has now been removed from the approved list on this device. Choose another video from the same approved channel.")
-                .setCancelable(false)
-                .setPositiveButton("Choose another video", (d, w) -> finish())
-                .show();
+
+        // Capture candidates before marking this ID, because marking deliberately
+        // invalidates the cached catalogue so the home screen refreshes later.
+        List<VideoItem> candidates = prefs.loadVideos();
+        String failedId = videoId;
+        prefs.markPlaybackRejected(failedId);
+
+        VideoItem next = null;
+        if (channelTitle != null && !channelTitle.isEmpty()) {
+            for (VideoItem v : candidates) {
+                if (!v.id.equals(failedId)
+                        && channelTitle.equalsIgnoreCase(v.channelTitle)
+                        && !prefs.isPlaybackRejected(v.id)) {
+                    next = v;
+                    break;
+                }
+            }
+        }
+        if (next == null) {
+            for (VideoItem v : candidates) {
+                if (!v.id.equals(failedId) && !prefs.isPlaybackRejected(v.id)) {
+                    next = v;
+                    break;
+                }
+            }
+        }
+
+        if (next != null) {
+            VideoItem chosen = next;
+            playerStatus.setText("That video cannot play inside apps. Trying another approved video…");
+            Toast.makeText(this, "YouTube blocked that video from embedded playback. Trying another approved video.", Toast.LENGTH_LONG).show();
+            web.postDelayed(() -> {
+                videoId = chosen.id;
+                title = chosen.title;
+                channelTitle = chosen.channelTitle;
+                prefs.addHistory(chosen.id);
+                loadPlayer();
+            }, 700);
+        } else {
+            playerStatus.setText("This video cannot be played inside approved apps. It has been removed.");
+            new AlertDialog.Builder(this)
+                    .setTitle("Video unavailable in embedded players")
+                    .setMessage("YouTube does not permit this particular video to play inside an embedded player (error " + code + "). It has been removed from this device. There are no other cached approved videos to switch to right now.")
+                    .setCancelable(false)
+                    .setPositiveButton("Back to videos", (d, w) -> finish())
+                    .show();
+        }
     }
 
     private final class PlayerBridge {
