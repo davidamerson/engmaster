@@ -6,30 +6,49 @@ import java.util.List;
 
 public final class AppConfig {
     private AppConfig() {}
+
     public static boolean isDaughter() { return "daughter".equals(BuildConfig.CHILD_PROFILE); }
     public static String childLabel() { return isDaughter() ? "Age 5" : "Age 10"; }
     public static int defaultMinMinutes() { return isDaughter() ? 4 : 5; }
+
     public static List<String> categories() {
-        if (isDaughter()) return Arrays.asList("Home", "Stories & Cartoons", "Animals & Nature", "Numbers & Reading", "Science", "Art & Making", "Favourites", "Watched");
-        return Arrays.asList("Home", "Science", "Engineering", "Space & Big Ideas", "Animals & Nature", "History & Big Ideas", "Art & Making", "Favourites", "Watched");
+        if (isDaughter()) {
+            return Arrays.asList(
+                    "Home", "Stories & Cartoons", "Animals & Nature", "Numbers & Reading",
+                    "Science", "Art & Making", "Favourites", "Watched");
+        }
+        return Arrays.asList(
+                "Home", "Science", "Engineering", "Space & Big Ideas", "Animals & Nature",
+                "History & Big Ideas", "Stories & Cartoons", "Numbers & Reading", "Art & Making",
+                "Favourites", "Watched");
     }
+
+    public static List<String> channelCategories() {
+        return Arrays.asList(
+                "Science", "Engineering", "Space & Big Ideas", "Animals & Nature",
+                "History & Big Ideas", "Stories & Cartoons", "Numbers & Reading", "Art & Making");
+    }
+
+    private static void addDaughterChannels(List<ChannelSpec> c) {
+        c.add(new ChannelSpec("Peppa Pig - Official Channel", "PeppaPigOfficial", "Stories & Cartoons"));
+        c.add(new ChannelSpec("Bluey - Official Channel", "BlueyOfficialChannel", "Stories & Cartoons"));
+        c.add(new ChannelSpec("Wolfoo Family", "WolfooFamily", "Stories & Cartoons"));
+        c.add(new ChannelSpec("Octonauts", "Octonauts", "Animals & Nature"));
+        c.add(new ChannelSpec("Wild Kratts", "WildKratts", "Animals & Nature"));
+        c.add(new ChannelSpec("Curious George Official", "CuriousGeorge", "Stories & Cartoons"));
+        c.add(new ChannelSpec("Numberblocks", "Numberblocks", "Numbers & Reading"));
+        c.add(new ChannelSpec("Alphablocks", "Alphablocks", "Numbers & Reading"));
+        c.add(new ChannelSpec("StoryBots", "StoryBots", "Science"));
+        c.add(new ChannelSpec("SciShow Kids", "SciShowKids", "Science"));
+        c.add(new ChannelSpec("Maddie Moate", "MaddieMoate", "Science"));
+        c.add(new ChannelSpec("Art for Kids Hub", "artforkidshub", "Art & Making"));
+        c.add(new ChannelSpec("Hey Duggee Official", "HeyDuggeeOfficial", "Stories & Cartoons"));
+    }
+
     public static List<ChannelSpec> defaultChannels() {
         List<ChannelSpec> c = new ArrayList<>();
-        if (isDaughter()) {
-            c.add(new ChannelSpec("Peppa Pig - Official Channel", "PeppaPigOfficial", "Stories & Cartoons"));
-            c.add(new ChannelSpec("Bluey - Official Channel", "BlueyOfficialChannel", "Stories & Cartoons"));
-            c.add(new ChannelSpec("Wolfoo Family", "WolfooFamily", "Stories & Cartoons"));
-            c.add(new ChannelSpec("Octonauts", "Octonauts", "Animals & Nature"));
-            c.add(new ChannelSpec("Wild Kratts", "WildKratts", "Animals & Nature"));
-            c.add(new ChannelSpec("Curious George Official", "CuriousGeorge", "Stories & Cartoons"));
-            c.add(new ChannelSpec("Numberblocks", "Numberblocks", "Numbers & Reading"));
-            c.add(new ChannelSpec("Alphablocks", "Alphablocks", "Numbers & Reading"));
-            c.add(new ChannelSpec("StoryBots", "StoryBots", "Science"));
-            c.add(new ChannelSpec("SciShow Kids", "SciShowKids", "Science"));
-            c.add(new ChannelSpec("Maddie Moate", "MaddieMoate", "Science"));
-            c.add(new ChannelSpec("Art for Kids Hub", "artforkidshub", "Art & Making"));
-            c.add(new ChannelSpec("Hey Duggee Official", "HeyDuggeeOfficial", "Stories & Cartoons"));
-        } else {
+        addDaughterChannels(c);
+        if (!isDaughter()) {
             c.add(new ChannelSpec("Mark Rober", "MarkRober", "Engineering"));
             c.add(new ChannelSpec("Science Max", "ScienceMax", "Science"));
             c.add(new ChannelSpec("Operation Ouch", "OperationOuch", "Science"));
@@ -49,10 +68,33 @@ public final class AppConfig {
         }
         return c;
     }
-    public static String defaultBlockedKeywords() { return isDaughter() ? "minecraft,roblox,fortnite,gaming,gameplay,#shorts,shorts,prank" : "minecraft,roblox,fortnite,gaming,gameplay,lego,dude perfect,mrbeast,#shorts,shorts"; }
-    public static String[] conversationQuestions(String title) {
-        if (isDaughter()) return new String[]{"Tell me what happened in this video.","What was the funniest or most exciting part?","Who was your favourite character or animal, and why?","Tell me one new thing you learned."};
-        return new String[]{"Explain the most interesting idea from this video in your own words.","What surprised you most, and why?","Tell me three things you learned from this video.","If you could ask the presenter one question, what would it be?"};
+
+    public static String defaultBlockedKeywords() {
+        return isDaughter()
+                ? "minecraft,roblox,fortnite,gaming,gameplay,#shorts,shorts,prank"
+                : "minecraft,roblox,fortnite,gaming,gameplay,lego,dude perfect,mrbeast,#shorts,shorts";
     }
-    public static String searchSuggestion() { return isDaughter() ? "Try saying animals, cartoons, numbers, drawing, or science." : "Try saying science, space, animals, history, engineering, or drawing."; }
+
+    public static String[] conversationQuestions(String title) {
+        if (isDaughter()) {
+            return new String[]{
+                    "Tell me what happened in this video.",
+                    "What was the funniest or most exciting part?",
+                    "Who was your favourite character or animal, and why?",
+                    "Tell me one new thing you learned."
+            };
+        }
+        return new String[]{
+                "Explain the most interesting idea from this video in your own words.",
+                "What surprised you most, and why?",
+                "Tell me three things you learned from this video.",
+                "If you could ask the presenter one question, what would it be?"
+        };
+    }
+
+    public static String searchSuggestion() {
+        return isDaughter()
+                ? "Try saying animals, cartoons, numbers, drawing, or science."
+                : "Try saying science, space, animals, history, engineering, cartoons, numbers, or drawing.";
+    }
 }
