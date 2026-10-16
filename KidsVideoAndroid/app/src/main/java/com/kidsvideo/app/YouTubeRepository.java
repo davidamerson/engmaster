@@ -46,7 +46,7 @@ public final class YouTubeRepository {
                     } catch (Exception ignored) {}
                 }
                 Collections.sort(all, (a, b) -> b.publishedAt.compareTo(a.publishedAt));
-                if (all.size() > 240) all = new ArrayList<>(all.subList(0, 240));
+                if (all.size() > 320) all = new ArrayList<>(all.subList(0, 320));
                 prefs.saveVideos(all);
                 cb.onSuccess(all);
             } catch (Exception e) {
@@ -75,49 +75,75 @@ public final class YouTubeRepository {
     }
 
     private List<VideoItem> playlistVideos(ChannelSpec c, String playlist) throws Exception {
-        String url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=12&playlistId="
+        // Pull a deeper slice than before because live streams, age-restricted items,
+        // or videos YouTube refuses to embed are intentionally removed below.
+        String url = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=35&playlistId="
                 + enc(playlist) + "&key=" + enc(prefs.apiKey());
         JSONObject o = get(url);
         JSONArray a = o.optJSONArray("items");
         List<String> ids = new ArrayList<>();
-        Map<String, JSONObject> snips = new HashMap<>();
+        Map<String, JSONObject> playlistSnips = new HashMap<>();
         if (a != null) {
             for (int i = 0; i < a.length(); i++) {
                 JSONObject s = a.getJSONObject(i).getJSONObject("snippet");
                 String id = s.getJSONObject("resourceId").optString("videoId");
                 if (!id.isEmpty()) {
                     ids.add(id);
-                    snips.put(id, s);
+                    playlistSnips.put(id, s);
                 }
             }
         }
         if (ids.isEmpty()) return new ArrayList<>();
 
-        String vu = "https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status&id="
+        // status.embeddable is useful but not a guarantee: YouTube documents that
+        // platform policy and third-party claims can still reject playback later.
+        // snippet.liveBroadcastContent and age rating let us proactively avoid two
+        // common classes of child-unfriendly / embed-problematic items.
+        String vu = "https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,status&id="
                 + enc(String.join(",", ids)) + "&key=" + enc(prefs.apiKey());
         JSONObject vo = get(vu);
-        Map<String, Long> dur = new HashMap<>();
-        Set<String> ok = new HashSet<>();
+        Map<String, Long> durations = new HashMap<>();
+        Set<String> allowed = new HashSet<>();
         JSONArray va = vo.optJSONArray("items");
         if (va != null) {
             for (int i = 0; i < va.length(); i++) {
                 JSONObject x = va.getJSONObject(i);
                 String id = x.optString("id");
+                if (id.isEmpty() || prefs.isPlaybackRejected(id)) continue;
+
+                JSONObject content = x.optJSONObject("contentDetails");
+                JSONObject status = x.optJSONObject("status");
+                JSONObject videoSnippet = x.optJSONObject("snippet");
+
                 long sec = 0;
                 try {
-                    sec = Duration.parse(x.getJSONObject("contentDetails").optString("duration", "PT0S")).getSeconds();
+                    sec = Duration.parse(content == null ? "PT0S" : content.optString("duration", "PT0S")).getSeconds();
                 } catch (Exception ignored) {}
-                dur.put(id, sec);
-                if (x.getJSONObject("status").optBoolean("embeddable", true)) ok.add(id);
+                durations.put(id, sec);
+
+                boolean embeddable = status == null || status.optBoolean("embeddable", true);
+                String liveState = videoSnippet == null ? "none" : videoSnippet.optString("liveBroadcastContent", "none");
+                boolean ordinaryUpload = "none".equalsIgnoreCase(liveState);
+                boolean ageRestricted = false;
+                if (content != null) {
+                    JSONObject rating = content.optJSONObject("contentRating");
+                    ageRestricted = rating != null && "ytAgeRestricted".equalsIgnoreCase(rating.optString("ytRating"));
+                }
+
+                if (embeddable && ordinaryUpload && !ageRestricted) allowed.add(id);
             }
         }
 
         List<VideoItem> out = new ArrayList<>();
         for (String id : ids) {
-            JSONObject s = snips.get(id);
-            long sec = dur.getOrDefault(id, 0L);
+            JSONObject s = playlistSnips.get(id);
+            if (s == null) continue;
+            long sec = durations.getOrDefault(id, 0L);
             String title = plain(s.optString("title"));
-            if (ok.contains(id) && sec >= prefs.minVideoMinutes() * 60L && !blocked(title)) {
+            if (allowed.contains(id)
+                    && sec >= prefs.minVideoMinutes() * 60L
+                    && !blocked(title)
+                    && !prefs.isPlaybackRejected(id)) {
                 String thumb = bestThumbnail(s.optJSONObject("thumbnails"));
                 out.add(new VideoItem(
                         id,
