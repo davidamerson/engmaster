@@ -6,7 +6,6 @@ import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
 import android.webkit.CookieManager;
@@ -16,7 +15,6 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Button;
-import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -40,6 +38,7 @@ public class PlayerActivity extends Activity {
     private int qIndex = 0;
     private TextView playerStatus;
     private WebViewAssetLoader assetLoader;
+    private boolean rejectionHandled = false;
 
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
@@ -89,9 +88,6 @@ public class PlayerActivity extends Activity {
         s.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) s.setSafeBrowsingEnabled(true);
 
-        // Explicitly keep Android WebView Media Integrity enabled when supported.
-        // YouTube's current Android embed implementation can use this attested app
-        // identity (package/version/signing certificate + device token).
         if (WebViewFeature.isFeatureSupported(WebViewFeature.WEBVIEW_MEDIA_INTEGRITY_API_STATUS)) {
             try {
                 WebViewMediaIntegrityApiStatusConfig config =
@@ -127,9 +123,8 @@ public class PlayerActivity extends Activity {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
                 String u = request.getUrl().toString();
-                // The main frame must remain our local HTTPS host page. YouTube itself
-                // is allowed only inside its iframe, so sign-in/related links cannot
-                // escape into unrestricted browsing inside this WebView.
+                // The main frame never leaves our own HTTPS app page. Any YouTube
+                // sign-in/search/related navigation therefore cannot escape the whitelist.
                 return !u.startsWith(APP_ASSET_ORIGIN + "/assets/");
             }
         });
@@ -137,6 +132,7 @@ public class PlayerActivity extends Activity {
 
     private void loadPlayer() {
         if (videoId == null || videoId.trim().isEmpty()) return;
+        rejectionHandled = false;
         playerStatus.setText("Loading secure in-app YouTube player…");
         String url = APP_ASSET_ORIGIN + "/assets/player.html?video=" + Uri.encode(videoId);
         web.stopLoading();
@@ -166,11 +162,6 @@ public class PlayerActivity extends Activity {
         retry.setAllCaps(false);
         retry.setOnClickListener(v -> loadPlayer());
 
-        Button official = new Button(this);
-        official.setText("▶ YouTube");
-        official.setAllCaps(false);
-        official.setOnClickListener(v -> askParentForOfficialPlayer());
-
         Button fav = new Button(this);
         fav.setText(prefs.isFavorite(videoId) ? "★" : "☆");
         fav.setContentDescription("Favourite");
@@ -195,7 +186,6 @@ public class PlayerActivity extends Activity {
             LinearLayout actionRow = new LinearLayout(this);
             actionRow.setGravity(Gravity.CENTER);
             actionRow.addView(retry, new LinearLayout.LayoutParams(0, -2, 1));
-            actionRow.addView(official, new LinearLayout.LayoutParams(0, -2, 1));
             actionRow.addView(talk, new LinearLayout.LayoutParams(0, -2, 2));
             outer.addView(actionRow);
         } else {
@@ -207,28 +197,22 @@ public class PlayerActivity extends Activity {
             outer.addView(row1);
 
             LinearLayout row2 = new LinearLayout(this);
-            row2.addView(official, new LinearLayout.LayoutParams(0, -2, 1));
-            row2.addView(talk, new LinearLayout.LayoutParams(0, -2, 2));
+            row2.addView(talk, new LinearLayout.LayoutParams(0, -2, 1));
             outer.addView(row2);
         }
         return outer;
     }
 
-    private void askParentForOfficialPlayer() {
-        EditText e = new EditText(this);
-        e.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_VARIATION_PASSWORD);
+    private void handleUnembeddable(String code) {
+        if (rejectionHandled) return;
+        rejectionHandled = true;
+        prefs.markPlaybackRejected(videoId);
+        playerStatus.setText("This video cannot be played inside approved apps. It has been removed from this device.");
         new AlertDialog.Builder(this)
-                .setTitle("Parent PIN")
-                .setMessage("The official YouTube app is the fallback if YouTube blocks embedded playback. It can show YouTube's own interface and recommendations.")
-                .setView(e)
-                .setPositiveButton("Open YouTube", (d, w) -> {
-                    if (e.getText().toString().equals(prefs.parentPin())) {
-                        ExternalPlayback.openOfficialYouTube(this, videoId);
-                    } else {
-                        Toast.makeText(this, "Incorrect PIN", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("Cancel", null)
+                .setTitle("Video removed")
+                .setMessage("YouTube does not permit this particular video to play in an embedded player (error " + code + "). It has now been removed from the approved list on this device. Choose another video from the same approved channel.")
+                .setCancelable(false)
+                .setPositiveButton("Choose another video", (d, w) -> finish())
                 .show();
     }
 
@@ -247,8 +231,12 @@ public class PlayerActivity extends Activity {
 
         @JavascriptInterface public void onError(String code) {
             runOnUiThread(() -> {
-                playerStatus.setText("YouTube playback error " + code + ". Try Retry, or parent can use ▶ YouTube fallback.");
-                Toast.makeText(PlayerActivity.this, "YouTube player error " + code, Toast.LENGTH_LONG).show();
+                if ("101".equals(code) || "150".equals(code) || "100".equals(code)) {
+                    handleUnembeddable(code);
+                } else {
+                    playerStatus.setText("YouTube playback error " + code + ". Press Retry.");
+                    Toast.makeText(PlayerActivity.this, "YouTube player error " + code, Toast.LENGTH_LONG).show();
+                }
             });
         }
 
