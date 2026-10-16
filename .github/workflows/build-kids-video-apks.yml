@@ -1,0 +1,63 @@
+name: Build Kids Video APKs
+
+on:
+  push:
+    branches: [ kids-video-build-20261016 ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Reconstruct Android project archive
+        run: |
+          cat .kids-build/part00 .kids-build/part01 .kids-build/part02 .kids-build/part03 .kids-build/part04 .kids-build/part05 .kids-build/part06 .kids-build/part07 .kids-build/part08 > .kids-build/project.b64
+          base64 --decode .kids-build/project.b64 > .kids-build/KidsVideoAndroid_Project.zip
+          mkdir -p .kids-build/work
+          unzip -q .kids-build/KidsVideoAndroid_Project.zip -d .kids-build/work
+          test -f .kids-build/work/KidsVideoAndroid/settings.gradle
+
+      - name: Build daughter and son debug APKs
+        working-directory: .kids-build/work/KidsVideoAndroid
+        run: gradle --no-daemon clean assembleDaughterDebug assembleSonDebug
+
+      - name: Collect APKs
+        run: |
+          mkdir -p .kids-build/apks
+          cp .kids-build/work/KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-build/apks/Daughter-Video.apk
+          cp .kids-build/work/KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-build/apks/Son-Video.apk
+          ls -lh .kids-build/apks
+
+      - name: Upload Daughter APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Daughter-Video-APK
+          path: .kids-build/apks/Daughter-Video.apk
+          if-no-files-found: error
+
+      - name: Upload Son APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Son-Video-APK
+          path: .kids-build/apks/Son-Video.apk
+          if-no-files-found: error
