@@ -29,23 +29,15 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Reconstruct Android project archive
-        run: |
-          cat .kids-build/part00 .kids-build/part01 .kids-build/part02 .kids-build/part03 .kids-build/part04 .kids-build/part05 .kids-build/part06 .kids-build/part07 .kids-build/part08 > .kids-build/project.b64
-          base64 --decode .kids-build/project.b64 > .kids-build/KidsVideoAndroid_Project.zip
-          mkdir -p .kids-build/work
-          unzip -q .kids-build/KidsVideoAndroid_Project.zip -d .kids-build/work
-          test -f .kids-build/work/KidsVideoAndroid/settings.gradle
-
       - name: Build daughter and son debug APKs
-        working-directory: .kids-build/work/KidsVideoAndroid
+        working-directory: KidsVideoAndroid
         run: gradle --no-daemon clean assembleDaughterDebug assembleSonDebug
 
       - name: Collect APKs
         run: |
           mkdir -p .kids-build/apks
-          cp .kids-build/work/KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-build/apks/Daughter-Video.apk
-          cp .kids-build/work/KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-build/apks/Son-Video.apk
+          cp KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-build/apks/Daughter-Video.apk
+          cp KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-build/apks/Son-Video.apk
           ls -lh .kids-build/apks
 
       - name: Upload Daughter APK
