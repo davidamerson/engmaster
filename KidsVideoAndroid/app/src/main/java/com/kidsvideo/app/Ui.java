@@ -64,10 +64,34 @@ public final class Ui {
     }
 
     public static void styleButton(TextView v, boolean selected) {
-        int fill = selected ? Color.rgb(255, 59, 48) : Color.rgb(42, 42, 42);
+        styleCategory(v, selected, false);
+    }
+
+    public static void styleCategory(TextView v, boolean selected, boolean focused) {
+        int fill;
+        int stroke;
+        int strokeWidth;
+        if (selected) {
+            fill = Color.rgb(220, 38, 38);
+            stroke = Color.rgb(255, 220, 220);
+            strokeWidth = 2;
+        } else if (focused) {
+            fill = Color.rgb(37, 99, 235);
+            stroke = Color.WHITE;
+            strokeWidth = 3;
+        } else {
+            fill = Color.rgb(52, 52, 58);
+            stroke = Color.rgb(85, 85, 92);
+            strokeWidth = 1;
+        }
+
+        GradientDrawable g = rounded(fill, 18, v.getContext());
+        g.setStroke(dp(v.getContext(), strokeWidth), stroke);
         v.setTextColor(Color.WHITE);
-        v.setBackground(rounded(fill, 18, v.getContext()));
-        v.setPadding(dp(v.getContext(), 16), dp(v.getContext(), 9), dp(v.getContext(), 16), dp(v.getContext(), 9));
+        v.setBackground(g);
+        v.setPadding(dp(v.getContext(), 17), dp(v.getContext(), 10), dp(v.getContext(), 17), dp(v.getContext(), 10));
+        v.setTypeface(null, selected ? 1 : 0);
+        v.setAlpha(1f);
     }
 
     public static void focusScale(View v, boolean focused) {
