@@ -1,0 +1,44 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.kidsvideo.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.kidsvideo.app"
+        minSdk 26
+        targetSdk 35
+        versionCode 1
+        versionName "1.0"
+        buildConfigField "String", "CHILD_PROFILE", '"daughter"'
+        buildConfigField "String", "APP_DISPLAY_NAME", '"Video"'
+    }
+    buildFeatures { buildConfig true }
+    flavorDimensions "child"
+    productFlavors {
+        daughter {
+            dimension "child"
+            applicationIdSuffix ".daughter"
+            versionNameSuffix "-daughter"
+            buildConfigField "String", "CHILD_PROFILE", '"daughter"'
+            buildConfigField "String", "APP_DISPLAY_NAME", '"Video"'
+            resValue "string", "app_name", "Video"
+        }
+        son {
+            dimension "child"
+            applicationIdSuffix ".son"
+            versionNameSuffix "-son"
+            buildConfigField "String", "CHILD_PROFILE", '"son"'
+            buildConfigField "String", "APP_DISPLAY_NAME", '"Video Explore"'
+            resValue "string", "app_name", "Video Explore"
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies { }

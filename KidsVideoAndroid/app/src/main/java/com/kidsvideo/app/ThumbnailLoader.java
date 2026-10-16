@@ -1,0 +1,6 @@
+package com.kidsvideo.app;
+import android.graphics.Bitmap; import android.graphics.BitmapFactory; import android.util.LruCache; import android.widget.ImageView; import java.io.InputStream; import java.net.HttpURLConnection; import java.net.URL; import java.util.concurrent.ExecutorService; import java.util.concurrent.Executors;
+public final class ThumbnailLoader {
+ private static final ExecutorService POOL=Executors.newFixedThreadPool(4); private static final LruCache<String,Bitmap>CACHE=new LruCache<String,Bitmap>(24*1024){@Override protected int sizeOf(String k,Bitmap v){return v.getByteCount()/1024;}}; private ThumbnailLoader(){}
+ public static void load(ImageView view,String url){if(url==null||url.isEmpty())return;view.setTag(url);Bitmap cached=CACHE.get(url);if(cached!=null){view.setImageBitmap(cached);return;}POOL.execute(()->{HttpURLConnection c=null;try{c=(HttpURLConnection)new URL(url).openConnection();c.setConnectTimeout(10000);c.setReadTimeout(10000);c.setInstanceFollowRedirects(true);try(InputStream in=c.getInputStream()){Bitmap b=BitmapFactory.decodeStream(in);if(b!=null){CACHE.put(url,b);view.post(()->{Object tag=view.getTag();if(url.equals(tag))view.setImageBitmap(b);});}}}}catch(Exception ignored){}finally{if(c!=null)c.disconnect();}});}
+}
