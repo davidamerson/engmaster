@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <style>
+    html, body, #player { width:100%; height:100%; margin:0; padding:0; background:#000; overflow:hidden; }
+    iframe { width:100% !important; height:100% !important; }
+  </style>
+</head>
+<body>
+<div id="player"></div>
+<script>
+(function () {
+  const params = new URLSearchParams(location.search);
+  const videoId = params.get('video') || '';
+  let player = null;
+
+  function send(name, value) {
+    try {
+      if (window.AndroidPlayer && typeof window.AndroidPlayer[name] === 'function') {
+        window.AndroidPlayer[name](String(value == null ? '' : value));
+      }
+    } catch (e) {}
+  }
+
+  window.onYouTubeIframeAPIReady = function () {
+    player = new YT.Player('player', {
+      width: '100%',
+      height: '100%',
+      videoId: videoId,
+      host: 'https://www.youtube.com',
+      playerVars: {
+        autoplay: 1,
+        playsinline: 1,
+        rel: 0,
+        controls: 1,
+        fs: 1,
+        origin: location.origin
+      },
+      events: {
+        onReady: function (event) {
+          send('onReady', videoId);
+          try { event.target.playVideo(); } catch (e) {}
+        },
+        onStateChange: function (event) {
+          send('onState', event.data);
+        },
+        onError: function (event) {
+          send('onError', event.data);
+        },
+        onAutoplayBlocked: function () {
+          send('onAutoplayBlocked', '1');
+        }
+      }
+    });
+  };
+
+  const tag = document.createElement('script');
+  tag.src = 'https://www.youtube.com/iframe_api';
+  tag.async = true;
+  tag.onerror = function () { send('onError', 'network'); };
+  document.head.appendChild(tag);
+})();
+</script>
+</body>
+</html>
