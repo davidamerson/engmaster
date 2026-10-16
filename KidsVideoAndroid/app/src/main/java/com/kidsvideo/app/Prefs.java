@@ -7,7 +7,6 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +31,8 @@ public final class Prefs {
     public void setVoiceLocale(String v) { p.edit().putString("voice_locale", v).apply(); }
     public String blockedKeywords() { return p.getString("blocked_keywords", AppConfig.defaultBlockedKeywords()); }
     public void setBlockedKeywords(String v) { p.edit().putString("blocked_keywords", v == null ? "" : v).apply(); }
+    public boolean useOfficialYouTubePlayer() { return p.getBoolean("official_youtube_player", false); }
+    public void setUseOfficialYouTubePlayer(boolean v) { p.edit().putBoolean("official_youtube_player", v).apply(); }
 
     public Set<String> disabledHandles() {
         return new HashSet<>(p.getStringSet("disabled_handles", new HashSet<>()));
