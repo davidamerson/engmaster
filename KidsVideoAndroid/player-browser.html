@@ -4,9 +4,10 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
-  <title>Video</title>
+  <title></title>
   <style>
-    html,body{position:fixed;inset:0;margin:0;width:100%;height:100%;background:#000;overflow:hidden}
+    html,body{margin:0;width:100%;min-height:calc(100vh + 120px);background:#000;overflow-y:scroll;overflow-x:hidden;scrollbar-width:none}
+    body::-webkit-scrollbar{display:none}
     #wrap,iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000}
   </style>
 </head>
@@ -16,6 +17,33 @@
     (() => {
       const id=(new URLSearchParams(location.search).get('v')||'').trim();
       if(!/^[A-Za-z0-9_-]{11}$/.test(id)) return;
+
+      // Custom Tabs can hide their URL bar when the page scrolls. The video itself
+      // stays fixed, so this tiny background scroll only collapses browser chrome.
+      const collapseChrome=()=>{
+        try{ window.scrollTo({top:110,left:0,behavior:'instant'}); }catch(_){ try{window.scrollTo(0,110);}catch(__){} }
+      };
+      setTimeout(collapseChrome,60);
+      setTimeout(collapseChrome,250);
+      setTimeout(collapseChrome,900);
+
+      // Browsers usually require a page-level user gesture for the Fullscreen API.
+      // We still try automatically, then retry instantly on the first remote/touch/key input.
+      const immersive=()=>{
+        try{
+          const el=document.documentElement;
+          if(!document.fullscreenElement && el.requestFullscreen){
+            const p=el.requestFullscreen({navigationUI:'hide'});
+            if(p && p.catch) p.catch(()=>{});
+          }
+        }catch(_){ }
+        collapseChrome();
+      };
+      setTimeout(immersive,500);
+      ['pointerdown','touchstart','keydown','click'].forEach(type=>{
+        window.addEventListener(type,immersive,{passive:true});
+      });
+
       const f=document.createElement('iframe');
       const params=new URLSearchParams({
         autoplay:'1',
@@ -30,9 +58,10 @@
       f.allow='autoplay; encrypted-media; picture-in-picture; fullscreen';
       f.allowFullscreen=true;
       f.referrerPolicy='strict-origin-when-cross-origin';
-      // Allow the YouTube player itself to run, but deny popup and top-level navigation
-      // so clicking branding cannot turn this page into unrestricted YouTube browsing.
+      // The child can use the official player controls, but the iframe cannot open
+      // unrestricted YouTube in a popup or replace our top-level safe player page.
       f.setAttribute('sandbox','allow-scripts allow-same-origin allow-presentation');
+      f.addEventListener('load',()=>{collapseChrome();setTimeout(collapseChrome,400);});
       document.getElementById('wrap').appendChild(f);
     })();
   </script>
