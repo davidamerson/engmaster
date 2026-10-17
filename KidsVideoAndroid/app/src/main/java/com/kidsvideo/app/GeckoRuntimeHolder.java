@@ -10,7 +10,6 @@ public final class GeckoRuntimeHolder {
     public static synchronized GeckoRuntime get(Context context) {
         if (runtime == null) {
             runtime = GeckoRuntime.create(context.getApplicationContext());
-            runtime.warmUp();
         }
         return runtime;
     }
