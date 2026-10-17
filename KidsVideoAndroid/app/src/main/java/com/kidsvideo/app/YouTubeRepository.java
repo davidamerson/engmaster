@@ -350,7 +350,6 @@ public final class YouTubeRepository {
         c.setConnectTimeout(8000);
         c.setReadTimeout(10000);
         c.setRequestProperty("Accept", "application/json");
-        c.setRequestProperty("Accept-Encoding", "gzip");
         int code = c.getResponseCode();
         InputStream in = code >= 200 && code < 300 ? c.getInputStream() : c.getErrorStream();
         String body = read(in);
