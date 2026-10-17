@@ -16,6 +16,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -43,6 +44,9 @@ public class MainActivity extends Activity {
     @Override public void onCreate(Bundle b) {
         super.onCreate(b);
         prefs = new Prefs(this);
+        // Keep the existing cache visible immediately, but force one background
+        // refresh so v1.9 can expand it into the smarter 70-per-channel library.
+        prefs.migrateCatalogueRevision("v19-smart-mix");
         repo = new YouTubeRepository(this);
         speech = new SpeechHelper(this);
         build();
@@ -60,6 +64,8 @@ public class MainActivity extends Activity {
                 && (videos.isEmpty() || prefs.cacheTime() == 0)) {
             load();
         } else if (list != null && !videos.isEmpty()) {
+            // Re-render immediately after a video is watched so watched items sink
+            // below unseen recommendations without waiting for the next API refresh.
             render();
         }
     }
@@ -227,7 +233,9 @@ public class MainActivity extends Activity {
         }
 
         loading = true;
-        status.setText(cache.isEmpty() ? "Loading approved channels…" : "Refreshing approved channels in background…");
+        status.setText(cache.isEmpty()
+                ? "Loading approved channels…"
+                : "Refreshing new recommendations in background…");
         repo.refresh(new YouTubeRepository.Callback() {
             public void onSuccess(List<VideoItem> v) {
                 runOnUiThread(() -> {
@@ -279,6 +287,19 @@ public class MainActivity extends Activity {
             filtered.add(v);
         }
 
+        // For Home and every normal category, unseen videos always come before
+        // already-watched ones. This updates immediately when returning from playback.
+        if (!category.equals("Watched") && !filtered.isEmpty() && !hist.isEmpty()) {
+            List<VideoItem> unseen = new ArrayList<>();
+            List<VideoItem> seen = new ArrayList<>();
+            for (VideoItem v : filtered) {
+                if (hist.contains(v.id)) seen.add(v); else unseen.add(v);
+            }
+            filtered.clear();
+            filtered.addAll(unseen);
+            filtered.addAll(seen);
+        }
+
         if (filtered.isEmpty()) {
             TextView e = new TextView(this);
             e.setText(q.isEmpty()
@@ -306,7 +327,8 @@ public class MainActivity extends Activity {
 
     private void updateStatus() {
         if (status == null || loading) return;
-        status.setText("Selected: " + category + "   •   " + renderedCount + "/" + filtered.size() + " shown");
+        status.setText("Selected: " + category + "   •   " + renderedCount + "/" + filtered.size()
+                + " shown   •   unseen first");
     }
 
     private View card(VideoItem v) {
@@ -325,8 +347,11 @@ public class MainActivity extends Activity {
         im.setAdjustViewBounds(false);
         int thumbWdp = Ui.thumbnailWidthDp(this);
         int thumbHdp = Math.round(thumbWdp * 9f / 16f);
-        if (horizontal) row.addView(im, new LinearLayout.LayoutParams(Ui.dp(this, thumbWdp), Ui.dp(this, thumbHdp)));
-        else row.addView(im, new LinearLayout.LayoutParams(-1, Ui.dp(this, thumbHdp)));
+        if (horizontal) {
+            row.addView(im, new LinearLayout.LayoutParams(Ui.dp(this, thumbWdp), Ui.dp(this, thumbHdp)));
+        } else {
+            row.addView(im, new LinearLayout.LayoutParams(-1, Ui.dp(this, thumbHdp)));
+        }
         ThumbnailLoader.load(im, v.thumbnailUrl);
 
         LinearLayout meta = new LinearLayout(this);
@@ -348,15 +373,15 @@ public class MainActivity extends Activity {
         sub.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 4));
         meta.addView(sub);
 
-        Button fav = new Button(this);
-        fav.setText(prefs.isFavorite(v.id) ? "★ Favourite" : "☆ Favourite");
-        fav.setAllCaps(false);
-        fav.setOnClickListener(x -> {
+        Button favButton = new Button(this);
+        favButton.setText(prefs.isFavorite(v.id) ? "★ Favourite" : "☆ Favourite");
+        favButton.setAllCaps(false);
+        favButton.setOnClickListener(x -> {
             prefs.toggleFavorite(v.id);
-            fav.setText(prefs.isFavorite(v.id) ? "★ Favourite" : "☆ Favourite");
+            favButton.setText(prefs.isFavorite(v.id) ? "★ Favourite" : "☆ Favourite");
             if (category.equals("Favourites")) render();
         });
-        meta.addView(fav, new LinearLayout.LayoutParams(-2, -2));
+        meta.addView(favButton, new LinearLayout.LayoutParams(-2, -2));
 
         if (horizontal) row.addView(meta, new LinearLayout.LayoutParams(0, -2, 1));
         else row.addView(meta, new LinearLayout.LayoutParams(-1, -2));
@@ -402,7 +427,9 @@ public class MainActivity extends Activity {
                     render();
                 });
             }
-            public void onError(String m) { runOnUiThread(() -> status.setText(m)); }
+            public void onError(String m) {
+                runOnUiThread(() -> status.setText(m));
+            }
         });
     }
 
