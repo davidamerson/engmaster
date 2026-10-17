@@ -20,7 +20,7 @@ android {
         minSdk 26
         targetSdk 35
         versionCode 11
-        versionName "1.9.1"
+        versionName "2.0"
         buildConfigField "String", "CHILD_PROFILE", '"daughter"'
         buildConfigField "String", "APP_DISPLAY_NAME", '"Video"'
     }
@@ -61,5 +61,6 @@ android {
 
 dependencies {
     implementation "androidx.browser:browser:1.8.0"
+    implementation "com.google.androidbrowserhelper:androidbrowserhelper:2.7.4"
     implementation "com.github.bumptech.glide:glide:4.16.0"
 }
