@@ -17,7 +17,8 @@ import androidx.browser.trusted.TrustedWebActivityIntentBuilder;
 import com.google.androidbrowserhelper.trusted.TwaLauncher;
 
 public class PlayerActivity extends Activity {
-    private static final String PLAYER_REVISION = "v20-twa-github-pages";
+    // Keep the existing revision ID so upgrading from v1.9.1 does not wipe the fast local catalogue cache.
+    private static final String PLAYER_REVISION = "v18-browser-backed";
     private static final String HOSTED_PLAYER = "https://davidamerson.github.io/player.html";
 
     private TwaLauncher twaLauncher;
@@ -62,9 +63,8 @@ public class PlayerActivity extends Activity {
                     null,
                     this::finish);
         } catch (Exception e) {
-            // TwaLauncher falls back to a normal Custom Tab if the installed browser cannot
-            // provide a TWA. On current Chrome/Google TV the Digital Asset Links verification
-            // should allow the immersive, toolbar-free path instead.
+            // If a device browser cannot provide a TWA, the launcher may fall back to a
+            // normal Custom Tab. Current Chrome/Google TV should use the verified immersive path.
             finish();
         }
     }
