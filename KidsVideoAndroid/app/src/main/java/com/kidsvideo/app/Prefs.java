@@ -105,8 +105,6 @@ public final class Prefs {
         return new ArrayList<>(result.values());
     }
 
-    // YouTube can report a video as embeddable in the Data API and still reject
-    // actual embedded playback later because of platform policy or rights claims.
     public Set<String> playbackRejectedVideos() {
         return new HashSet<>(p.getStringSet("playback_rejected_ids", new HashSet<>()));
     }
@@ -128,9 +126,6 @@ public final class Prefs {
         clearCache();
     }
 
-    // Player v1.4 fixes the WebView identity/Referer implementation. Any IDs that
-    // older builds rejected may have been false negatives caused by our old origin,
-    // so clear them exactly once whenever the player integration revision changes.
     public void migratePlayerRevision(String revision) {
         String old = p.getString("player_revision", "");
         if (!revision.equals(old)) {
@@ -139,6 +134,18 @@ public final class Prefs {
                     .remove("playback_rejected_ids")
                     .remove("video_cache")
                     .remove("cache_time")
+                    .apply();
+        }
+    }
+
+    // Refresh the smarter recommendation catalogue once without deleting the old
+    // cache. The old cards appear instantly while the larger library refreshes in background.
+    public void migrateCatalogueRevision(String revision) {
+        String old = p.getString("catalogue_revision", "");
+        if (!revision.equals(old)) {
+            p.edit()
+                    .putString("catalogue_revision", revision)
+                    .putLong("cache_time", 0L)
                     .apply();
         }
     }
