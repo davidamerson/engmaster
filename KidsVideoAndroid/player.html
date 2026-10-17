@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+  <meta name="referrer" content="strict-origin-when-cross-origin" />
+  <title>Kids Video Player</title>
+  <style>
+    html,body,#player{position:fixed;inset:0;margin:0;width:100%;height:100%;background:#000;overflow:hidden}
+    iframe{position:fixed!important;inset:0!important;width:100%!important;height:100%!important;border:0!important}
+  </style>
+</head>
+<body>
+  <div id="player"></div>
+  <script>
+    (function(){
+      const params=new URLSearchParams(location.search);
+      const id=(params.get('v')||'').trim();
+      const valid=/^[A-Za-z0-9_-]{11}$/.test(id);
+      function bridge(name,value){
+        try{
+          if(window.AndroidPlayer && typeof window.AndroidPlayer[name]==='function'){
+            window.AndroidPlayer[name](String(value==null?'':value));
+          }
+        }catch(_){ }
+      }
+      if(!valid){bridge('onError','bad_id');return;}
+      window.onYouTubeIframeAPIReady=function(){
+        new YT.Player('player',{
+          videoId:id,
+          width:'100%',height:'100%',host:'https://www.youtube.com',
+          playerVars:{autoplay:1,playsinline:1,rel:0,controls:1,fs:1,origin:location.origin,widget_referrer:location.href},
+          events:{
+            onReady:function(e){bridge('onReady',id);try{e.target.playVideo();}catch(_){ }},
+            onStateChange:function(e){bridge('onState',e.data);},
+            onError:function(e){bridge('onError',e.data);},
+            onAutoplayBlocked:function(){bridge('onAutoplayBlocked','1');}
+          }
+        });
+      };
+      const script=document.createElement('script');
+      script.src='https://www.youtube.com/iframe_api';
+      script.async=true;
+      script.onerror=function(){bridge('onError','network');};
+      document.head.appendChild(script);
+    })();
+  </script>
+</body>
+</html>
