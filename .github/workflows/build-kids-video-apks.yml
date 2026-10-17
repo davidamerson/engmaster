@@ -32,6 +32,12 @@ jobs:
       - name: Prepare stable family test signing key
         run: base64 --decode KidsVideoAndroid/app/kids-test.keystore.b64 > KidsVideoAndroid/app/kids-test.keystore
 
+      - name: Record stable signing fingerprint
+        run: |
+          mkdir -p .kids-build
+          keytool -list -v -keystore KidsVideoAndroid/app/kids-test.keystore -storepass android -alias androiddebugkey | grep 'SHA256:' | sed 's/^[[:space:]]*//' > .kids-build/signing-fingerprint.txt
+          cat .kids-build/signing-fingerprint.txt
+
       - name: Build daughter and son debug APKs
         working-directory: KidsVideoAndroid
         run: gradle --no-daemon clean assembleDaughterDebug assembleSonDebug
@@ -55,4 +61,11 @@ jobs:
         with:
           name: Son-Video-APK
           path: .kids-build/apks/Son-Video.apk
+          if-no-files-found: error
+
+      - name: Upload signing fingerprint
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kids-Video-Signing-Fingerprint
+          path: .kids-build/signing-fingerprint.txt
           if-no-files-found: error
