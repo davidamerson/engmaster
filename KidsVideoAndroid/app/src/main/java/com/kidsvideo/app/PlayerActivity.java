@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.app.Activity;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
@@ -21,7 +22,9 @@ import androidx.webkit.WebViewFeature;
 import androidx.webkit.WebViewMediaIntegrityApiStatusConfig;
 
 public class PlayerActivity extends Activity {
-    private static final String PLAYER_REVISION = "v14-appid-referrer";
+    private static final String PLAYER_REVISION = "v16-hosted-player";
+    private static final String HOSTED_PLAYER = "https://raw.githack.com/davidamerson/engmaster/kids-video-build-20261016/KidsVideoAndroid/player.html";
+    private static final String HOSTED_HOST = "raw.githack.com";
 
     private Prefs prefs;
     private WebView web;
@@ -30,7 +33,6 @@ public class PlayerActivity extends Activity {
     private TimeLimit limit;
     private String title;
     private String videoId;
-    private String appOrigin;
     private int qIndex = 0;
     private boolean errorShown = false;
     private boolean conversationShown = false;
@@ -44,7 +46,6 @@ public class PlayerActivity extends Activity {
         limit = new TimeLimit(this);
         videoId = getIntent().getStringExtra("id");
         title = getIntent().getStringExtra("title");
-        appOrigin = "https://" + getPackageName();
 
         if (!Ui.isTv(this)) setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
@@ -97,7 +98,7 @@ public class PlayerActivity extends Activity {
                                 WebViewMediaIntegrityApiStatusConfig.WEBVIEW_MEDIA_INTEGRITY_API_ENABLED)
                                 .build();
                 WebSettingsCompat.setWebViewMediaIntegrityApiStatus(s, config);
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) { }
         }
 
         CookieManager cookies = CookieManager.getInstance();
@@ -110,44 +111,20 @@ public class PlayerActivity extends Activity {
         web.setWebViewClient(new WebViewClient() {
             @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
-                String u = request.getUrl().toString();
-                return !(u.startsWith(appOrigin) || u.equals("about:blank"));
+                Uri u = request.getUrl();
+                if ("https".equalsIgnoreCase(u.getScheme()) && HOSTED_HOST.equalsIgnoreCase(u.getHost())) return false;
+                return true; // never let the child escape the hosted player into normal YouTube/browser pages
             }
         });
-    }
-
-    private String jsEscape(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("'", "\\'").replace("\r", "").replace("\n", "");
-    }
-
-    private String buildPlayerHtml() {
-        String id = jsEscape(videoId);
-        String origin = jsEscape(appOrigin);
-        return "<!doctype html><html><head>"
-                + "<meta charset='utf-8'>"
-                + "<meta name='viewport' content='width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no'>"
-                + "<meta name='referrer' content='strict-origin-when-cross-origin'>"
-                + "<style>html,body,#player{position:fixed;inset:0;width:100%;height:100%;margin:0;padding:0;background:#000;overflow:hidden}iframe{position:absolute;inset:0;width:100%!important;height:100%!important;border:0}</style>"
-                + "</head><body><div id='player'></div><script>"
-                + "(function(){var videoId='" + id + "';var appOrigin='" + origin + "';"
-                + "function send(n,v){try{if(window.AndroidPlayer&&typeof window.AndroidPlayer[n]==='function')window.AndroidPlayer[n](String(v==null?'':v));}catch(e){}}"
-                + "window.onYouTubeIframeAPIReady=function(){new YT.Player('player',{width:'100%',height:'100%',videoId:videoId,host:'https://www.youtube.com',"
-                + "playerVars:{autoplay:1,playsinline:1,rel:0,controls:1,fs:0,origin:appOrigin,widget_referrer:appOrigin},"
-                + "events:{onReady:function(e){send('onReady',videoId);try{e.target.playVideo();}catch(x){}},"
-                + "onStateChange:function(e){send('onState',e.data);},onError:function(e){send('onError',e.data);},"
-                + "onAutoplayBlocked:function(){send('onAutoplayBlocked','1');}}});};"
-                + "var tag=document.createElement('script');tag.src='https://www.youtube.com/iframe_api';tag.async=true;"
-                + "tag.onerror=function(){send('onError','network');};document.head.appendChild(tag);})();"
-                + "</script></body></html>";
     }
 
     private void loadPlayer() {
         if (videoId == null || videoId.trim().isEmpty()) return;
         errorShown = false;
         conversationShown = false;
+        String url = HOSTED_PLAYER + "?v=" + Uri.encode(videoId) + "&r=16";
         web.stopLoading();
-        web.loadDataWithBaseURL(appOrigin + "/", buildPlayerHtml(), "text/html", "UTF-8", null);
+        web.loadUrl(url);
     }
 
     private void showPlaybackError(String code) {
@@ -155,9 +132,9 @@ public class PlayerActivity extends Activity {
         errorShown = true;
         String message;
         if ("150".equals(code) || "101".equals(code)) {
-            message = "YouTube refused embedded playback on this network/device. If this happens to every video on home Wi-Fi but works on your phone hotspot, the home internet connection is being challenged by YouTube. The video has NOT been deleted from your approved list.";
+            message = "YouTube refused this embedded playback (error " + code + ").";
         } else if ("153".equals(code)) {
-            message = "YouTube could not verify the embedded app identity (error 153).";
+            message = "YouTube could not verify the hosted player identity (error 153).";
         } else {
             message = "YouTube playback error " + code + ".";
         }
