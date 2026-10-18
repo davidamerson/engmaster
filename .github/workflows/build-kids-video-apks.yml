@@ -1,8 +1,8 @@
-name: Build Kids Video APKs
+name: Build Kids Video v4 APKs
 
 on:
   push:
-    branches: [ kids-video-build-20261016 ]
+    branches: [ kids-video-v4-integrity-webview-20261018 ]
   workflow_dispatch:
 
 jobs:
@@ -38,34 +38,34 @@ jobs:
           keytool -list -v -keystore KidsVideoAndroid/app/kids-test.keystore -storepass android -alias androiddebugkey | grep 'SHA256:' | sed 's/^[[:space:]]*//' > .kids-build/signing-fingerprint.txt
           cat .kids-build/signing-fingerprint.txt
 
-      - name: Build daughter and son debug APKs
+      - name: Build daughter and son v4 debug APKs
         working-directory: KidsVideoAndroid
         run: gradle --no-daemon clean assembleDaughterDebug assembleSonDebug
 
       - name: Collect APKs
         run: |
           mkdir -p .kids-build/apks
-          cp KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-build/apks/Daughter-Video.apk
-          cp KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-build/apks/Son-Video.apk
+          cp KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-build/apks/Daughter-Video-v4.0.apk
+          cp KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-build/apks/Son-Video-Explore-v4.0.apk
           ls -lh .kids-build/apks
 
       - name: Upload Daughter APK
         uses: actions/upload-artifact@v4
         with:
-          name: Daughter-Video-APK
-          path: .kids-build/apks/Daughter-Video.apk
+          name: Daughter-Video-v4.0-APK
+          path: .kids-build/apks/Daughter-Video-v4.0.apk
           if-no-files-found: error
 
       - name: Upload Son APK
         uses: actions/upload-artifact@v4
         with:
-          name: Son-Video-APK
-          path: .kids-build/apks/Son-Video.apk
+          name: Son-Video-Explore-v4.0-APK
+          path: .kids-build/apks/Son-Video-Explore-v4.0.apk
           if-no-files-found: error
 
       - name: Upload signing fingerprint
         uses: actions/upload-artifact@v4
         with:
-          name: Kids-Video-Signing-Fingerprint
+          name: Kids-Video-v4-Signing-Fingerprint
           path: .kids-build/signing-fingerprint.txt
           if-no-files-found: error
