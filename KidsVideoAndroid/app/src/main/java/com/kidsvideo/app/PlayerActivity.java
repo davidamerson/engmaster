@@ -5,6 +5,8 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.graphics.Color;
 import android.net.Uri;
@@ -18,15 +20,22 @@ import android.widget.FrameLayout;
 import java.util.List;
 
 /**
- * TV-only playback bridge for v3.2.
+ * TV-only playback bridge for v3.3.
  *
- * The native SmartTube-derived engine stalls on the user's tunneled ZIVPN route while
- * the official YouTube TV app plays correctly.  Therefore v3.2 deliberately uses the
- * official YouTube TV app as the network/player engine, and relies on our accessibility
- * PlaybackGuardService to swallow navigation keys while an approved video is playing.
+ * The Xiaomi/ZIVPN combination plays reliably in the official YouTube TV app, while
+ * embedded/native third-party engines do not.  v3.3 therefore keeps YouTube enabled only
+ * as a hidden playback engine: our accessibility guard immediately ejects any normal
+ * launcher-opened YouTube session, but explicitly allows the one video launched here.
  */
 public class PlayerActivity extends Activity {
-    private static final String PLAYER_REVISION = "tv-official-youtube-guard-v1";
+    private static final String PLAYER_REVISION = "tv-official-youtube-lock-v2";
+    private static final String[] YOUTUBE_PACKAGES = {
+            "com.google.android.youtube.tv", "com.google.android.youtube"
+    };
+    private static final String[] KIDS_PACKAGES = {
+            "com.kidsvideo.tv.son", "com.kidsvideo.tv.daughter"
+    };
+
     private boolean launched;
     private boolean pausedAfterLaunch;
 
@@ -48,15 +57,33 @@ public class PlayerActivity extends Activity {
             return;
         }
 
-        if (!isPlaybackGuardEnabled()) {
+        String youtubePackage = findEnabledYouTubePackage();
+        if (youtubePackage == null) {
+            showEnableYouTube();
+            return;
+        }
+
+        if (!isAnyPlaybackGuardEnabled()) {
             showGuardSetup();
             return;
         }
 
-        launchOfficialYouTube(videoId);
+        authorizeGuard(true);
+        launchOfficialYouTube(videoId, youtubePackage);
     }
 
-    private boolean isPlaybackGuardEnabled() {
+    private String findEnabledYouTubePackage() {
+        PackageManager pm = getPackageManager();
+        for (String pkg : YOUTUBE_PACKAGES) {
+            try {
+                ApplicationInfo info = pm.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS);
+                if (info.enabled) return pkg;
+            } catch (PackageManager.NameNotFoundException ignored) {}
+        }
+        return null;
+    }
+
+    private boolean isAnyPlaybackGuardEnabled() {
         AccessibilityManager manager = (AccessibilityManager) getSystemService(ACCESSIBILITY_SERVICE);
         if (manager == null) return false;
         List<AccessibilityServiceInfo> services = manager.getEnabledAccessibilityServiceList(
@@ -64,59 +91,92 @@ public class PlayerActivity extends Activity {
         for (AccessibilityServiceInfo info : services) {
             if (info == null || info.getResolveInfo() == null) continue;
             ServiceInfo service = info.getResolveInfo().serviceInfo;
-            if (service != null && getPackageName().equals(service.packageName)
-                    && PlaybackGuardService.class.getName().equals(service.name)) {
-                return true;
+            if (service == null || service.packageName == null || service.name == null) continue;
+            if (!service.name.equals(PlaybackGuardService.class.getName())) continue;
+            for (String kidsPkg : KIDS_PACKAGES) {
+                if (kidsPkg.equals(service.packageName)) return true;
             }
         }
         return false;
     }
 
-    private void showGuardSetup() {
+    private void authorizeGuard(boolean active) {
+        // Authorize both sibling packages. Only the package whose accessibility service is
+        // enabled will actually enforce the lock, so the parent only needs to enable one guard.
+        for (String pkg : KIDS_PACKAGES) {
+            try {
+                Intent i = new Intent(GuardControlReceiver.ACTION);
+                i.setPackage(pkg);
+                i.putExtra(GuardControlReceiver.EXTRA_ACTIVE, active);
+                sendBroadcast(i, "com.kidsvideo.tv.permission.CONTROL_GUARD");
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void showEnableYouTube() {
         new AlertDialog.Builder(this)
-                .setTitle("One-time parent setup")
-                .setMessage("To keep children inside the selected video, enable ‘Kids Video playback guard’ in Accessibility settings. " +
-                        "This lets the app block YouTube navigation buttons while an approved video is playing.\n\n" +
-                        "Also open the normal YouTube TV app once and turn Autoplay OFF. Then come back and select the video again.")
-                .setPositiveButton("Open Accessibility settings", (d, w) -> {
+                .setTitle("Enable YouTube TV once")
+                .setMessage("YouTube is currently disabled on this box. v3.3 uses the official YouTube TV app only as a playback engine, but the Kids Video guard prevents children from opening YouTube normally.\n\nEnable YouTube, turn Autoplay OFF inside YouTube, then come back here.")
+                .setPositiveButton("Open YouTube app settings", (d, w) -> {
+                    String pkg = findInstalledYouTubePackage();
+                    if (pkg == null) { finish(); return; }
                     try {
-                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
-                    } catch (Exception e) {
-                        finish();
-                    }
+                        startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                Uri.parse("package:" + pkg)));
+                    } catch (Exception e) { finish(); }
                 })
                 .setNegativeButton("Back", (d, w) -> finish())
                 .setOnCancelListener(d -> finish())
                 .show();
     }
 
-    private void launchOfficialYouTube(String videoId) {
-        PlaybackGuardService.setGuardActive(this, true);
+    private String findInstalledYouTubePackage() {
+        PackageManager pm = getPackageManager();
+        for (String pkg : YOUTUBE_PACKAGES) {
+            try {
+                pm.getApplicationInfo(pkg, PackageManager.MATCH_DISABLED_COMPONENTS);
+                return pkg;
+            } catch (PackageManager.NameNotFoundException ignored) {}
+        }
+        return null;
+    }
 
-        String[] packages = {"com.google.android.youtube.tv", "com.google.android.youtube"};
+    private void showGuardSetup() {
+        new AlertDialog.Builder(this)
+                .setTitle("One-time parent setup")
+                .setMessage("Enable ONE service named ‘Kids Video YouTube lock’ in Accessibility settings.\n\nAfter that, if a child finds and opens the normal YouTube app from the TV launcher, it will immediately close and return to Kids Video. Only videos selected inside Son/Daughter Kids Video are temporarily allowed.\n\nAlso keep YouTube Autoplay OFF.")
+                .setPositiveButton("Open Accessibility settings", (d, w) -> {
+                    try {
+                        startActivity(new Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS));
+                    } catch (Exception e) { finish(); }
+                })
+                .setNegativeButton("Back", (d, w) -> finish())
+                .setOnCancelListener(d -> finish())
+                .show();
+    }
+
+    private void launchOfficialYouTube(String videoId, String pkg) {
         Uri[] uris = {
                 Uri.parse("vnd.youtube://" + videoId),
                 Uri.parse("https://www.youtube.com/watch?v=" + Uri.encode(videoId))
         };
 
-        for (String pkg : packages) {
-            for (Uri uri : uris) {
-                try {
-                    Intent play = new Intent(Intent.ACTION_VIEW, uri);
-                    play.setPackage(pkg);
-                    play.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-                    launched = true;
-                    startActivity(play);
-                    return;
-                } catch (ActivityNotFoundException | SecurityException ignored) {}
-            }
+        for (Uri uri : uris) {
+            try {
+                Intent play = new Intent(Intent.ACTION_VIEW, uri);
+                play.setPackage(pkg);
+                play.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                launched = true;
+                startActivity(play);
+                return;
+            } catch (ActivityNotFoundException | SecurityException ignored) {}
         }
 
-        PlaybackGuardService.setGuardActive(this, false);
+        authorizeGuard(false);
         launched = false;
         new AlertDialog.Builder(this)
-                .setTitle("YouTube TV app required")
-                .setMessage("The official YouTube TV app could not be opened on this box.")
+                .setTitle("YouTube TV could not open")
+                .setMessage("The official YouTube TV playback engine is enabled, but this video link could not be opened.")
                 .setPositiveButton("Back", (d, w) -> finish())
                 .setOnCancelListener(d -> finish())
                 .show();
@@ -131,15 +191,13 @@ public class PlayerActivity extends Activity {
         super.onResume();
         hideSystemUi();
         if (launched && pausedAfterLaunch) {
-            PlaybackGuardService.setGuardActive(this, false);
+            authorizeGuard(false);
             finish();
         }
     }
 
     @Override protected void onDestroy() {
-        if (!launched || pausedAfterLaunch) {
-            PlaybackGuardService.setGuardActive(this, false);
-        }
+        if (!launched || pausedAfterLaunch) authorizeGuard(false);
         super.onDestroy();
     }
 
