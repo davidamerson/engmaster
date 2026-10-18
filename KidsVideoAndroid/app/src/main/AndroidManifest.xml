@@ -10,7 +10,8 @@
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
     <queries>
-        <package android:name="com.kidsvideo.tvplayer" />
+        <package android:name="com.google.android.youtube.tv" />
+        <package android:name="com.google.android.youtube" />
         <intent><action android:name="android.speech.RecognitionService" /></intent>
         <intent><action android:name="android.intent.action.TTS_SERVICE" /></intent>
     </queries>
@@ -24,6 +25,19 @@
         android:banner="@drawable/tv_banner"
         android:label="@string/app_name"
         android:theme="@style/AppTheme">
+
+        <service
+            android:name=".PlaybackGuardService"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true"
+            android:label="Kids Video playback guard">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/playback_guard_service" />
+        </service>
 
         <activity
             android:name=".PlayerActivity"
