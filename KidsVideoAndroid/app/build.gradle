@@ -19,11 +19,10 @@ android {
         applicationId "com.kidsvideo.tv"
         minSdk 26
         targetSdk 35
-        versionCode 21
-        versionName "3.1-tv"
+        versionCode 22
+        versionName "3.2-tv"
         buildConfigField "String", "CHILD_PROFILE", '"daughter"'
         buildConfigField "String", "APP_DISPLAY_NAME", '"Video TV"'
-        buildConfigField "String", "TV_PLAYER_ENGINE_PACKAGE", '"com.kidsvideo.tvplayer31"'
     }
 
     buildFeatures { buildConfig true }
