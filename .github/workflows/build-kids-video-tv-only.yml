@@ -39,20 +39,20 @@ jobs:
       - name: Collect TV APKs
         run: |
           mkdir -p .kids-tv-build
-          cp KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-tv-build/Daughter-Video-TV-v3.2.apk
-          cp KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-tv-build/Son-Video-TV-v3.2.apk
+          cp KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-tv-build/Daughter-Video-TV-v3.3.apk
+          cp KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-tv-build/Son-Video-TV-v3.3.apk
           ls -lh .kids-tv-build
 
       - name: Upload Daughter TV APK
         uses: actions/upload-artifact@v4
         with:
-          name: Daughter-Video-TV-v3.2-APK
-          path: .kids-tv-build/Daughter-Video-TV-v3.2.apk
+          name: Daughter-Video-TV-v3.3-APK
+          path: .kids-tv-build/Daughter-Video-TV-v3.3.apk
           if-no-files-found: error
 
       - name: Upload Son TV APK
         uses: actions/upload-artifact@v4
         with:
-          name: Son-Video-TV-v3.2-APK
-          path: .kids-tv-build/Son-Video-TV-v3.2.apk
+          name: Son-Video-TV-v3.3-APK
+          path: .kids-tv-build/Son-Video-TV-v3.3.apk
           if-no-files-found: error
