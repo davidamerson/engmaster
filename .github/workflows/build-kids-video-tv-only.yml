@@ -39,22 +39,22 @@ jobs:
       - name: Collect TV catalogue APKs
         run: |
           mkdir -p .kids-tv-build
-          cp KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-tv-build/Daughter-Video-TV.apk
-          cp KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-tv-build/Son-Video-TV.apk
+          cp KidsVideoAndroid/app/build/outputs/apk/daughter/debug/app-daughter-debug.apk .kids-tv-build/Daughter-Video-TV-v3.1.apk
+          cp KidsVideoAndroid/app/build/outputs/apk/son/debug/app-son-debug.apk .kids-tv-build/Son-Video-TV-v3.1.apk
           ls -lh .kids-tv-build
 
       - name: Upload Daughter TV APK
         uses: actions/upload-artifact@v4
         with:
-          name: Daughter-Video-TV-APK
-          path: .kids-tv-build/Daughter-Video-TV.apk
+          name: Daughter-Video-TV-v3.1-APK
+          path: .kids-tv-build/Daughter-Video-TV-v3.1.apk
           if-no-files-found: error
 
       - name: Upload Son TV APK
         uses: actions/upload-artifact@v4
         with:
-          name: Son-Video-TV-APK
-          path: .kids-tv-build/Son-Video-TV.apk
+          name: Son-Video-TV-v3.1-APK
+          path: .kids-tv-build/Son-Video-TV-v3.1.apk
           if-no-files-found: error
 
   native-player-engine:
@@ -63,8 +63,6 @@ jobs:
       - name: Checkout TV branch patches
         uses: actions/checkout@v4
 
-      # Current sdkmanager itself requires Java 17. Install all Android components first,
-      # then switch to Java 11 for SmartTube's Gradle 7.5 / AGP 7.4 build.
       - name: Set up JDK 17 for Android SDK manager
         uses: actions/setup-java@v5
         with:
@@ -81,17 +79,17 @@ jobs:
             "build-tools;30.0.3" \
             "ndk;21.0.6113669"
 
-      - name: Set up JDK 11 for SmartTube 32.68 build
+      - name: Set up JDK 11 for SmartTube build
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '11'
 
-      - name: Clone pinned SmartTube source with submodules
+      - name: Clone SmartTube source with SABR stalled-network failover
         run: |
           git clone https://github.com/yuliskov/SmartTube.git SmartTubeEngine
           cd SmartTubeEngine
-          git checkout ffa16426ea3c7c82077e0f00228818b85f373588
+          git checkout c20141118400e62b4c40d54f9a71fc368cc4c41c
           git submodule sync --recursive
           git submodule update --init --recursive
           chmod +x gradlew
@@ -99,6 +97,16 @@ jobs:
 
       - name: Apply Kids TV player-only patch
         run: python3 .kids-tv-engine/patch_smarttube.py
+
+      - name: Prepare stable TV engine signing key
+        run: |
+          base64 --decode KidsVideoAndroid/app/kids-test.keystore.b64 > SmartTubeEngine/smarttubetv/kids-tv.keystore
+          cat > SmartTubeEngine/keystore.properties <<'EOF'
+          storeFile=kids-tv.keystore
+          storePassword=android
+          keyAlias=androiddebugkey
+          keyPassword=android
+          EOF
 
       - name: Build ARMv7 native TV engine
         working-directory: SmartTubeEngine
@@ -109,12 +117,12 @@ jobs:
           mkdir -p .kids-tv-engine-out
           ENGINE_APK=$(find SmartTubeEngine/smarttubetv/build/outputs/apk -type f -name '*armeabi-v7a.apk' | head -n 1)
           test -n "$ENGINE_APK"
-          cp "$ENGINE_APK" .kids-tv-engine-out/Kids-TV-Player-Engine.apk
-          ls -lh "$ENGINE_APK" .kids-tv-engine-out/Kids-TV-Player-Engine.apk
+          cp "$ENGINE_APK" .kids-tv-engine-out/Kids-TV-Player-Engine-v3.1.apk
+          ls -lh "$ENGINE_APK" .kids-tv-engine-out/Kids-TV-Player-Engine-v3.1.apk
 
       - name: Upload native TV player engine
         uses: actions/upload-artifact@v4
         with:
-          name: Kids-TV-Player-Engine-ARMv7
-          path: .kids-tv-engine-out/Kids-TV-Player-Engine.apk
+          name: Kids-TV-Player-Engine-v3.1-ARMv7
+          path: .kids-tv-engine-out/Kids-TV-Player-Engine-v3.1.apk
           if-no-files-found: error
