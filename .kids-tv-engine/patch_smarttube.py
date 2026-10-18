@@ -26,6 +26,13 @@ replace(
     'ststable {\n            applicationId "com.kidsvideo.tvplayer"'
 )
 
+# This private engine does not use SmartTube's Firebase/Crashlytics registration.
+# Removing the upstream google-services.json prevents the Google Services plugin from
+# rejecting our deliberately different application id during the build.
+google_services = ROOT / "smarttubetv/google-services.json"
+if google_services.exists():
+    google_services.unlink()
+
 # ZIVPN/SSH tunnels are mandatory for this household. SmartTube contains an optional
 # Conscrypt network path specifically intended to improve TLS/VPN compatibility;
 # enable it by default in this dedicated engine. It remains SmartTube's own code path.
