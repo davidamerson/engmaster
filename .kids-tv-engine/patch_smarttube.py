@@ -55,7 +55,9 @@ p.write_text(text.replace(needle, insert, 1), encoding="utf-8")
 
 # Hide the engine from the Android/Google TV launcher and remove normal browser/search
 # entry points. Keep only SmartTube's vnd.youtube intent filter, which our catalogue uses
-# with an explicit package name.
+# with an explicit package name. Leave the upstream app label unchanged to avoid manifest
+# merge conflicts with SmartTube's leanback-assistant module; there is no launcher entry
+# anyway, so children cannot open this engine directly from the TV home screen.
 p = ROOT / "smarttubetv/src/main/AndroidManifest.xml"
 text = p.read_text(encoding="utf-8")
 
@@ -72,9 +74,6 @@ def strip_filter(match):
     return block
 
 text = re.sub(r"\s*<intent-filter>.*?</intent-filter>", strip_filter, text, flags=re.S)
-# Rename only the hidden engine application label when it appears in Settings > Apps.
-text = text.replace('android:label="@string/app_name"\n        android:theme=',
-                    'android:label="Kids TV Player Engine"\n        android:theme=', 1)
 p.write_text(text, encoding="utf-8")
 
 print("SmartTube source patched as com.kidsvideo.tvplayer")
