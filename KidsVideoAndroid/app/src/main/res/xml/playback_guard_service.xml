@@ -3,6 +3,8 @@
     android:description="@string/playback_guard_description"
     android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagRequestFilterKeyEvents"
+    android:packageNames="com.google.android.youtube.tv,com.google.android.youtube"
     android:notificationTimeout="50"
     android:canRequestFilterKeyEvents="true"
     android:canRetrieveWindowContent="false" />
