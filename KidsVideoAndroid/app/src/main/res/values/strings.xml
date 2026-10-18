@@ -1,1 +1,5 @@
-<?xml version="1.0" encoding="utf-8"?><resources><string name="setup_title">Parent setup</string></resources>
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">Parent setup</string>
+    <string name="playback_guard_description">Blocks YouTube TV navigation while a parent-approved Kids Video item is playing.</string>
+</resources>
