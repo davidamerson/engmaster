@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="setup_title">Parent setup</string>
-    <string name="playback_guard_description">Blocks YouTube TV navigation while a parent-approved Kids Video item is playing.</string>
+    <string name="playback_guard_description">Locks the normal YouTube TV app unless a video was selected inside Kids Video, then blocks navigation away from that approved video.</string>
 </resources>
