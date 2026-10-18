@@ -16,13 +16,14 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.kidsvideo.app"
+        applicationId "com.kidsvideo.tv"
         minSdk 26
         targetSdk 35
-        versionCode 11
-        versionName "2.0"
+        versionCode 20
+        versionName "3.0-tv"
         buildConfigField "String", "CHILD_PROFILE", '"daughter"'
-        buildConfigField "String", "APP_DISPLAY_NAME", '"Video"'
+        buildConfigField "String", "APP_DISPLAY_NAME", '"Video TV"'
+        buildConfigField "String", "TV_PLAYER_ENGINE_PACKAGE", '"com.kidsvideo.tvplayer"'
     }
 
     buildFeatures { buildConfig true }
@@ -34,16 +35,16 @@ android {
             applicationIdSuffix ".daughter"
             versionNameSuffix "-daughter"
             buildConfigField "String", "CHILD_PROFILE", '"daughter"'
-            buildConfigField "String", "APP_DISPLAY_NAME", '"Video"'
-            resValue "string", "app_name", "Video"
+            buildConfigField "String", "APP_DISPLAY_NAME", '"Video TV"'
+            resValue "string", "app_name", "Video TV"
         }
         son {
             dimension "child"
             applicationIdSuffix ".son"
             versionNameSuffix "-son"
             buildConfigField "String", "CHILD_PROFILE", '"son"'
-            buildConfigField "String", "APP_DISPLAY_NAME", '"Video Explore"'
-            resValue "string", "app_name", "Video Explore"
+            buildConfigField "String", "APP_DISPLAY_NAME", '"Video Explore TV"'
+            resValue "string", "app_name", "Video Explore TV"
         }
     }
 
@@ -60,7 +61,5 @@ android {
 }
 
 dependencies {
-    implementation "androidx.browser:browser:1.8.0"
-    implementation "com.google.androidbrowserhelper:androidbrowserhelper:2.7.4"
     implementation "com.github.bumptech.glide:glide:4.16.0"
 }
